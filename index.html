@@ -1423,12 +1423,7 @@ function writeSheetData(ss, sheetName, headers, items) {
     let state = {
       currentTab: 'schedule',
       role: 'teacher',
-      currentUser: {
-        username: 'teacher01',
-        fullName: 'อ.กิตติพงศ์ พัฒนาวิทย์',
-        department: 'แผนกวิชาเทคนิคคอมพิวเตอร์ / เทคโนโลยีสารสนเทศ',
-        role: 'teacher'
-      },
+      currentUser: null,
       selectedDate: getTodayISO(),
       scheduleCategory: 'ALL',
       roomSearch: '',
