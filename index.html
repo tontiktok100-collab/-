@@ -1,0 +1,3109 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ระบบจองห้องเรียนและห้องปฏิบัติการ วิทยาลัยการอาชีพสระบุรี (SICEC Room Booking)</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <style>
+    body {
+      font-family: 'Sarabun', 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    .scrollbar-thin::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 9999px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    @media print {
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      body { background: white; }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 no-print">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm">
+          <i data-lucide="school" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 leading-tight">ระบบจองห้องเรียนและห้องปฏิบัติการ วิทยาลัยการอาชีพสระบุรี</h1>
+          <p class="text-xs text-slate-500">Saraburi Industrial and Community Education College (อ.พระพุทธบาท จ.สระบุรี)</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto max-w-full">
+        <button type="button" data-tab="schedule" class="nav-tab px-3.5 py-1.5 rounded-lg text-sm font-semibold transition flex items-center gap-1.5 bg-white text-indigo-600 shadow-sm">
+          <i data-lucide="calendar-clock" class="w-4 h-4"></i>
+          <span>ตารางการใช้ห้อง</span>
+        </button>
+        <button type="button" data-tab="rooms" class="nav-tab px-3.5 py-1.5 rounded-lg text-sm font-semibold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900">
+          <i data-lucide="building-2" class="w-4 h-4"></i>
+          <span>ข้อมูลห้องทั้งหมด</span>
+        </button>
+        <button type="button" data-tab="mybookings" class="nav-tab px-3.5 py-1.5 rounded-lg text-sm font-semibold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900">
+          <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+          <span>รายการจอง</span>
+          <span id="badge-total-bookings" class="px-1.5 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-700 font-bold">0</span>
+        </button>
+        <button type="button" id="nav-tab-admin" data-tab="admin" class="nav-tab hidden px-3.5 py-1.5 rounded-lg text-sm font-semibold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900">
+          <i data-lucide="shield-check" class="w-4 h-4"></i>
+          <span>สำหรับผู้ดูแล</span>
+          <span id="badge-pending-count" class="px-1.5 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 font-bold">0</span>
+        </button>
+        <button type="button" id="nav-tab-database" data-tab="database" class="nav-tab hidden px-3.5 py-1.5 rounded-lg text-sm font-semibold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900">
+          <i data-lucide="database" class="w-4 h-4 text-emerald-600"></i>
+          <span>ฐานข้อมูล Google Sheets</span>
+        </button>
+      </nav>
+
+      <!-- User Session, Role & Quick Booking Action -->
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Logged-in user badge -->
+        <div id="user-session-box" class="flex items-center gap-2 bg-indigo-50/80 border border-indigo-200/80 rounded-xl px-2.5 py-1">
+          <div id="user-avatar-initials" class="w-7 h-7 rounded-lg bg-indigo-600 text-white text-xs font-bold flex items-center justify-center shrink-0">กพ</div>
+          <div class="leading-tight">
+            <div id="user-display-name" class="text-xs font-bold text-slate-900">อ.กิตติพงศ์ พัฒนาวิทย์</div>
+            <div id="user-display-dept" class="text-[10px] text-slate-500">วิทยาศาสตร์และเทคโนโลยี</div>
+          </div>
+          <button type="button" id="btn-open-auth-modal" class="ml-1 px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-indigo-600 border border-indigo-200 text-[11px] font-semibold transition" title="สลับบัญชีหรือออกจากระบบ">
+            สลับบัญชี
+          </button>
+          <button type="button" id="btn-logout" class="p-1 rounded-lg hover:bg-rose-100 text-rose-600 transition" title="ออกจากระบบ">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div id="account-role-pill" class="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5">
+          <i data-lucide="shield" class="w-3.5 h-3.5 text-indigo-600"></i>
+          <span id="account-role-text" class="text-xs font-bold text-slate-700">มุมมอง: ครู / บุคลากร</span>
+          <select id="role-select" class="hidden" aria-hidden="true">
+            <option value="teacher">มุมมอง: ครู / บุคลากร</option>
+            <option value="admin">มุมมอง: ผู้ดูแลระบบ (อนุมัติ/จัดการ)</option>
+          </select>
+        </div>
+        <button type="button" id="btn-open-booking-modal" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm transition flex items-center gap-1.5">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          <span>จองห้องใหม่</span>
+        </button>
+        <button type="button" id="btn-download-ready-html" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5" title="ดาวน์โหลดไฟล์เว็บแอป .html ไปเปิดใช้งานได้ทันที">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>ดาวน์โหลดไฟล์ระบบ (.html)</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 no-print">
+
+    <!-- Top Summary Cards -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+          <i data-lucide="door-open" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-500">ห้องที่เปิดให้จองทั้งหมด</p>
+          <p id="stat-total-rooms" class="text-xl font-bold text-slate-900">0 ห้อง</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+          <i data-lucide="calendar-check-2" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-500">การจองในวันที่เลือก</p>
+          <p id="stat-today-bookings" class="text-xl font-bold text-slate-900">0 รายการ</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+          <i data-lucide="clock-4" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-500">รออนุมัติทั้งหมด</p>
+          <p id="stat-pending-bookings" class="text-xl font-bold text-slate-900">0 รายการ</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+          <i data-lucide="sparkles" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-500">อัตราว่างในวันที่เลือก</p>
+          <p id="stat-free-rate" class="text-xl font-bold text-slate-900">0%</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 1: SCHEDULE MATRIX (ตารางการใช้ห้องรายวันตามคาบเรียน) -->
+    <section id="view-schedule" class="space-y-4">
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5">
+        <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div>
+            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span>ตารางการใช้ห้องรายคาบเรียน</span>
+              <span id="selected-date-label" class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700"></span>
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">คลิกที่ช่องว่างเพื่อจองคาบเรียนนั้นทันที หรือคลิกที่รายการจองเพื่อดูรายละเอียดใบจอง</p>
+          </div>
+
+          <!-- Date & Category Filter Controls -->
+          <div class="flex flex-wrap items-center gap-2.5">
+            <div class="flex items-center bg-slate-100 rounded-xl p-1">
+              <button type="button" id="btn-prev-day" class="p-1.5 rounded-lg hover:bg-white text-slate-600 transition" title="วันก่อนหน้า">
+                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+              </button>
+              <input type="date" id="schedule-date-picker" class="bg-transparent text-xs font-semibold text-slate-800 px-2 py-1 focus:outline-none cursor-pointer" />
+              <button type="button" id="btn-next-day" class="p-1.5 rounded-lg hover:bg-white text-slate-600 transition" title="วันถัดไป">
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+              </button>
+              <button type="button" id="btn-today" class="px-2.5 py-1 text-xs font-semibold text-indigo-600 hover:bg-white rounded-lg transition">
+                วันนี้
+              </button>
+            </div>
+
+            <select id="schedule-category-filter" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="ALL">ทุกประเภทห้อง</option>
+              <option value="ห้องปฏิบัติการคอมพิวเตอร์">ห้องปฏิบัติการคอมพิวเตอร์</option>
+              <option value="ห้องปฏิบัติการวิทยาศาสตร์">ห้องปฏิบัติการวิทยาศาสตร์</option>
+              <option value="ห้องประชุม / โสตทัศนศึกษา">ห้องประชุม / โสตทัศนศึกษา</option>
+              <option value="ห้องสมุด / ศูนย์การเรียนรู้">ห้องสมุด / ศูนย์การเรียนรู้</option>
+              <option value="ห้องดนตรี / ศิลปะ / กีฬา">ห้องดนตรี / ศิลปะ / กีฬา</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-3 pb-2 text-xs text-slate-600">
+          <div class="flex flex-wrap items-center gap-4">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-50 border border-dashed border-slate-300 inline-block"></span> ว่าง (คลิกเพื่อจอง)</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-emerald-100 border border-emerald-400 inline-block"></span> อนุมัติแล้ว</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-amber-100 border border-amber-400 inline-block"></span> รออนุมัติ</span>
+          </div>
+          <span class="text-slate-400">คาบเรียนมาตรฐานโรงเรียน 08:30 – 16:30 น. (9 ช่วงเวลา)</span>
+        </div>
+
+        <!-- Matrix Table -->
+        <div class="overflow-x-auto scrollbar-thin mt-2 border border-slate-200 rounded-xl">
+          <table class="w-full text-left border-collapse min-w-[920px]">
+            <thead>
+              <tr id="schedule-header-row" class="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs">
+                <!-- Populated by JS -->
+              </tr>
+            </thead>
+            <tbody id="schedule-matrix-body" class="divide-y divide-slate-200 text-xs">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: ROOM DIRECTORY (ข้อมูลห้องเรียนและสิ่งอำนวยความสะดวก) -->
+    <section id="view-rooms" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">รายการห้องเรียน ห้องปฏิบัติการ และห้องประชุม</h2>
+            <p class="text-xs text-slate-500">ตรวจสอบความจุ อาคาร อุปกรณ์ประจำห้อง และสถานะการเปิดใช้งาน</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="relative">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+              <input type="text" id="room-search-input" placeholder="ค้นหาชื่อห้อง, อาคาร, อุปกรณ์..." class="pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-60" />
+            </div>
+            <select id="room-capacity-filter" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none">
+              <option value="0">ความจุทั้งหมด</option>
+              <option value="30">ตั้งแต่ 30 ที่นั่งขึ้นไป</option>
+              <option value="45">ตั้งแต่ 45 ที่นั่งขึ้นไป</option>
+              <option value="100">ตั้งแต่ 100 ที่นั่งขึ้นไป</option>
+            </select>
+            <button type="button" id="btn-open-add-room" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition flex items-center gap-1.5">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>เพิ่มห้องใหม่</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="rooms-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: BOOKINGS LIST (รายการจองทั้งหมด & ค้นหา/พิมพ์ใบจอง) -->
+    <section id="view-mybookings" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">รายการจองห้องเรียนทั้งหมด</h2>
+            <p class="text-xs text-slate-500">ค้นหา กรองตามกลุ่มสาระฯ ดูใบจอง หรือส่งออกรายงาน CSV สำหรับฝ่ายบริหารงานทั่วไป</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="relative">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+              <input type="text" id="booking-search-input" placeholder="ค้นหาชื่อครู, วิชา, ห้อง, รหัสจอง..." class="pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 w-56" />
+            </div>
+            <select id="booking-status-filter" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none">
+              <option value="ALL">ทุกสถานะ</option>
+              <option value="APPROVED">อนุมัติแล้ว</option>
+              <option value="PENDING">รออนุมัติ</option>
+              <option value="REJECTED">ไม่อนุมัติ / ยกเลิก</option>
+            </select>
+            <button type="button" id="btn-export-csv" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition flex items-center gap-1.5">
+              <i data-lucide="download" class="w-4 h-4"></i>
+              <span>ส่งออก CSV</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto border border-slate-200 rounded-xl">
+          <table class="w-full text-left border-collapse min-w-[820px]">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs">
+                <th class="py-3 px-4 font-semibold">รหัส / วันที่ใช้ห้อง</th>
+                <th class="py-3 px-4 font-semibold">ห้องที่จอง</th>
+                <th class="py-3 px-4 font-semibold">ช่วงคาบเรียน</th>
+                <th class="py-3 px-4 font-semibold">ผู้จอง / กลุ่มสาระฯ</th>
+                <th class="py-3 px-4 font-semibold">วัตถุประสงค์ / ชั้นเรียน</th>
+                <th class="py-3 px-4 font-semibold">สถานะ</th>
+                <th class="py-3 px-4 font-semibold text-right">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="bookings-table-body" class="divide-y divide-slate-200 text-xs">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 4: ADMIN & APPROVAL PANEL (ผู้ดูแลระบบและฝ่ายอาคารสถานที่) -->
+    <section id="view-admin" class="hidden space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- Pending Approvals Card -->
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div>
+              <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="check-circle-2" class="w-5 h-5 text-indigo-600"></i>
+                <span>คำขอจองที่รอการอนุมัติ (ฝ่ายอาคารสถานที่ / วิชาการ)</span>
+              </h2>
+              <p class="text-xs text-slate-500">ห้องประชุมใหญ่หรือห้องปฏิบัติการพิเศษที่ตั้งค่าให้ต้องอนุมัติก่อนใช้งานจะแสดงที่นี่</p>
+            </div>
+            <button type="button" id="btn-approve-all" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition">
+              อนุมัติทั้งหมดที่รออยู่
+            </button>
+          </div>
+          <div id="admin-pending-list" class="space-y-3">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Settings & Quick System Tools -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5 space-y-4">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="settings" class="w-5 h-5 text-slate-700"></i>
+            <span>ตั้งค่าระบบโรงเรียน</span>
+          </h3>
+
+          <div class="space-y-3 text-xs">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+              <label class="flex items-center justify-between cursor-pointer">
+                <span class="font-semibold text-slate-700">อนุมัติอัตโนมัติสำหรับห้องเรียนทั่วไป</span>
+                <input type="checkbox" id="setting-auto-approve" class="w-4 h-4 accent-indigo-600 rounded cursor-pointer" checked />
+              </label>
+              <p class="text-slate-500">หากเปิดไว้ ห้องทั่วไปจะอนุมัติทันที ยกเว้นห้องประชุมใหญ่ที่ต้องรอฝ่ายอาคารอนุมัติ</p>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+              <p class="font-semibold text-slate-700">สถิติแยกตามกลุ่มสาระการเรียนรู้</p>
+              <div id="department-stats-list" class="space-y-2 pt-1">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-rose-50/60 border border-rose-200 space-y-2">
+              <p class="font-semibold text-rose-900">รีเซ็ตข้อมูลตัวอย่าง (Demo Data)</p>
+              <p class="text-rose-700">คืนค่าข้อมูลห้องเรียนและตารางการจองเริ่มต้นของโรงเรียนสำหรับการทดสอบ</p>
+              <button type="button" id="btn-reset-demo-data" class="w-full py-2 rounded-lg bg-white hover:bg-rose-100 text-rose-700 border border-rose-300 font-semibold transition">
+                รีเซ็ตข้อมูลเริ่มต้น
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN DATA EDITOR (CRUD FOR ROOMS, BOOKINGS, AND USERS) -->
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="sliders-horizontal" class="w-5 h-5 text-indigo-600"></i>
+              <span>ระบบจัดการและแก้ไขฐานข้อมูลสำหรับผู้ดูแลระบบ (Admin Data Editor)</span>
+            </h3>
+            <p class="text-xs text-slate-500">เพิ่ม แก้ไข หรือลบข้อมูลห้องเรียน รายการจอง และบัญชีบุคลากรได้โดยตรงจากหน้าเว็บ</p>
+          </div>
+
+          <!-- Admin Sub-Tabs -->
+          <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+            <button type="button" data-admin-subtab="rooms" class="admin-subtab-btn px-3 py-1.5 rounded-lg bg-white text-indigo-600 shadow-2xs transition">
+              จัดการห้องเรียน (Rooms)
+            </button>
+            <button type="button" data-admin-subtab="bookings" class="admin-subtab-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">
+              แก้ไขรายการจอง (Bookings)
+            </button>
+            <button type="button" data-admin-subtab="users" class="admin-subtab-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">
+              จัดการบุคลากร (Users)
+            </button>
+          </div>
+        </div>
+
+        <!-- SUBTAB 1: ADMIN ROOMS CRUD -->
+        <div id="admin-subview-rooms" class="space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-xs font-semibold text-slate-600">คลิกปุ่ม "แก้ไข" เพื่อปรับปรุงชื่อห้อง ความจุ อุปกรณ์ หรือเปลี่ยนสถานะซ่อมบำรุง</p>
+            <button type="button" id="btn-admin-add-room" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>เพิ่มห้องเรียนใหม่</span>
+            </button>
+          </div>
+          <div class="overflow-x-auto border border-slate-200 rounded-xl">
+            <table class="w-full text-left border-collapse min-w-[780px] text-xs">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-slate-600">
+                  <th class="py-2.5 px-3 font-semibold">รหัส</th>
+                  <th class="py-2.5 px-3 font-semibold">ชื่อห้อง / อาคาร</th>
+                  <th class="py-2.5 px-3 font-semibold">ประเภท / ความจุ</th>
+                  <th class="py-2.5 px-3 font-semibold">อุปกรณ์ประจำห้อง</th>
+                  <th class="py-2.5 px-3 font-semibold">เงื่อนไขอนุมัติ</th>
+                  <th class="py-2.5 px-3 font-semibold">สถานะห้อง</th>
+                  <th class="py-2.5 px-3 font-semibold text-right">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="admin-rooms-tbody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SUBTAB 2: ADMIN BOOKINGS CRUD -->
+        <div id="admin-subview-bookings" class="hidden space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-xs font-semibold text-slate-600">แก้ไขรายละเอียดการจอง เปลี่ยนห้อง/คาบเรียน หรือเปลี่ยนสถานะการอนุมัติ</p>
+            <button type="button" id="btn-admin-add-booking" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>เพิ่มรายการจองใหม่</span>
+            </button>
+          </div>
+          <div class="overflow-x-auto border border-slate-200 rounded-xl">
+            <table class="w-full text-left border-collapse min-w-[820px] text-xs">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-slate-600">
+                  <th class="py-2.5 px-3 font-semibold">รหัส / วันที่</th>
+                  <th class="py-2.5 px-3 font-semibold">ห้องเรียน / คาบ</th>
+                  <th class="py-2.5 px-3 font-semibold">ครูผู้จอง / กลุ่มสาระฯ</th>
+                  <th class="py-2.5 px-3 font-semibold">วิชา / ชั้นเรียน</th>
+                  <th class="py-2.5 px-3 font-semibold">สถานะ</th>
+                  <th class="py-2.5 px-3 font-semibold text-right">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="admin-bookings-tbody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SUBTAB 3: ADMIN USERS CRUD -->
+        <div id="admin-subview-users" class="hidden space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-xs font-semibold text-slate-600">จัดการบัญชีผู้ใช้ รหัสผ่าน กลุ่มสาระการเรียนรู้ และกำหนดสิทธิ์ผู้ดูแลระบบ</p>
+            <button type="button" id="btn-admin-add-user" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5">
+              <i data-lucide="user-plus" class="w-4 h-4"></i>
+              <span>เพิ่มบุคลากรใหม่</span>
+            </button>
+          </div>
+          <div class="overflow-x-auto border border-slate-200 rounded-xl">
+            <table class="w-full text-left border-collapse min-w-[720px] text-xs">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-slate-600">
+                  <th class="py-2.5 px-3 font-semibold">Username</th>
+                  <th class="py-2.5 px-3 font-semibold">ชื่อ-นามสกุล</th>
+                  <th class="py-2.5 px-3 font-semibold">กลุ่มสาระการเรียนรู้ / ฝ่าย</th>
+                  <th class="py-2.5 px-3 font-semibold">รหัสผ่าน</th>
+                  <th class="py-2.5 px-3 font-semibold">สิทธิ์การใช้งาน</th>
+                  <th class="py-2.5 px-3 font-semibold text-right">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users-tbody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 5: GOOGLE SHEETS DATABASE CONNECTION & SYNC -->
+    <section id="view-database" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-5">
+        <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <i data-lucide="file-spreadsheet" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 class="text-base font-bold text-slate-900">ฐานข้อมูล Google Sheets (Cloud Database)</h2>
+                <span id="gsheet-sync-badge" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">พร้อมใช้งาน</span>
+              </div>
+              <p class="text-xs text-slate-500">จัดเก็บตารางห้องเรียน (Rooms), รายการจอง (Bookings), บัญชีบุคลากร (Users) และสถิติ (Summary) บน Google Sheets</p>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <a href="https://docs.google.com/spreadsheets/d/1XCmfA9swRSGV7RmzGpDq3Bz0YesYGPtRrRMWhYkKzIE/edit" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
+              <i data-lucide="external-link" class="w-4 h-4"></i>
+              <span>เปิดไฟล์ Google Sheets ฐานข้อมูล</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Database Schema Overview Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-800">1. แท็บ Rooms</span>
+              <span id="db-count-rooms" class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 font-bold">7 แถว</span>
+            </div>
+            <p class="text-slate-500">เก็บข้อมูลห้องเรียน อาคาร ความจุ ประเภท อุปกรณ์ประจำห้อง และสถานะ</p>
+          </div>
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-800">2. แท็บ Bookings</span>
+              <span id="db-count-bookings" class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">6 แถว</span>
+            </div>
+            <p class="text-slate-500">เก็บรหัสการจอง วันที่ คาบเริ่มต้น-สิ้นสุด ครูผู้จอง กลุ่มสาระฯ และสถานะอนุมัติ</p>
+          </div>
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-800">3. แท็บ Users</span>
+              <span id="db-count-users" class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">5 แถว</span>
+            </div>
+            <p class="text-slate-500">เก็บข้อมูล Username, Password, ชื่อ-นามสกุล, กลุ่มสาระฯ และสิทธิ์การใช้งาน</p>
+          </div>
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-800">4. แท็บ Summary</span>
+              <span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-bold">Auto Formula</span>
+            </div>
+            <p class="text-slate-500">สรุปสถิติการใช้ห้องรายห้อง รายกลุ่มสาระฯ และสถานะด้วยสูตร COUNTIFS</p>
+          </div>
+        </div>
+
+        <!-- Live Web App API Endpoint Configuration -->
+        <div class="hidden">
+          <div class="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-3.5 text-xs">
+            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="cloud-cog" class="w-4 h-4 text-indigo-600"></i>
+              <span>เชื่อมต่อการซิงค์ข้อมูลอัตโนมัติ (Google Apps Script Web App URL)</span>
+            </h3>
+            <p class="text-slate-600 leading-relaxed">
+              เมื่อนำโค้ดด้านขวาไปวางในเมนู <strong>ส่วนขยาย (Extensions) &gt; Apps Script</strong> ของไฟล์ Google Sheets และกด <strong>Deploy &gt; New deployment (Web app)</strong> แล้วให้นำ URL มาวางที่นี่เพื่อซิงค์ข้อมูลแบบเรียลไทม์:
+            </p>
+
+            <div>
+              <label for="gsheet-webapp-url" class="block font-semibold text-slate-700 mb-1">Google Apps Script Web App URL</label>
+              <input type="url" id="gsheet-webapp-url" placeholder="https://script.google.com/macros/s/AKfycb.../exec" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 pt-1">
+              <button type="button" id="btn-save-gsheet-url" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold transition">
+                บันทึก URL
+              </button>
+              <button type="button" id="btn-sync-push-gsheet" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold transition flex items-center gap-1.5">
+                <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                <span>ส่งข้อมูลขึ้น Google Sheets (Push)</span>
+              </button>
+              <button type="button" id="btn-sync-pull-gsheet" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition flex items-center gap-1.5">
+                <i data-lucide="download-cloud" class="w-4 h-4"></i>
+                <span>ดึงข้อมูลจาก Google Sheets (Pull)</span>
+              </button>
+            </div>
+
+            <div class="pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
+              <span class="text-slate-500">หรือดาวน์โหลดไฟล์ TSV/CSV สำหรับนำเข้าแต่ละแท็บด้วยตนเอง:</span>
+              <div class="flex items-center gap-1.5">
+                <button type="button" id="btn-export-rooms-csv" class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold">
+                  CSV ห้องเรียน
+                </button>
+                <button type="button" id="btn-export-users-csv" class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold">
+                  CSV ผู้ใช้งาน
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Apps Script Code Box -->
+          <div class="p-4 rounded-2xl border border-slate-200 bg-slate-900 text-slate-100 space-y-2.5 text-xs flex flex-col justify-between">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <span class="font-bold text-emerald-400">โค้ดสำหรับวางในไฟล์ รหัส.gs (รองรับทั้ง API และ Index.html โดยไม่ติด Error)</span>
+                <p class="text-[11px] text-amber-300 font-medium">ป้องกันปัญหา "ไม่พบไฟล์ HTML ชื่อ Index" อัตโนมัติ (ทำงานได้ทันทีแม้ยังไม่ได้สร้างไฟล์ Index.html)</p>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button type="button" id="btn-copy-apps-script" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-1.5 transition">
+                  <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                  <span>คัดลอกโค้ด</span>
+                </button>
+                <button type="button" id="btn-copy-full-html" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-1.5 transition" title="คัดลอกโค้ดหน้าเว็บทั้งหมดเพื่อนำไปวางในไฟล์ Index.html">
+                  <i data-lucide="file-code" class="w-3.5 h-3.5"></i>
+                  <span>คัดลอก HTML (Index.html)</span>
+                </button>
+              </div>
+            </div>
+            <pre id="apps-script-code" class="bg-slate-950 p-3 rounded-xl overflow-x-auto text-[11px] text-slate-200 font-mono max-h-60 scrollbar-thin leading-relaxed">var SPREADSHEET_ID = '1XCmfA9swRSGV7RmzGpDq3Bz0YesYGPtRrRMWhYkKzIE';
+
+function getTargetSpreadsheet() {
+  try {
+    var active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) return active;
+  } catch (e) {}
+  return SpreadsheetApp.openById(SPREADSHEET_ID);
+}
+
+function doGet(e) {
+  var isApi = e && e.parameter && e.parameter.mode === 'api';
+  if (!isApi) {
+    try {
+      return HtmlService.createHtmlOutputFromFile('Index')
+        .setTitle('ระบบจองห้องเรียน (Smart School Room Booking)')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    } catch (err1) {
+      try {
+        return HtmlService.createHtmlOutputFromFile('index')
+          .setTitle('ระบบจองห้องเรียน (Smart School Room Booking)')
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      } catch (err2) {
+        // หากยังไม่ได้สร้างไฟล์ Index.html จะส่งข้อมูล JSON API แทนโดยไม่เกิด Error
+      }
+    }
+  }
+  return ContentService
+    .createTextOutput(JSON.stringify(getAppData()))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  if (!e || !e.postData || !e.postData.contents) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'ready', message: 'doPost พร้อมทำงาน' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  var payload = JSON.parse(e.postData.contents);
+  saveAppData(payload);
+  return ContentService
+    .createTextOutput(JSON.stringify({ status: 'saved' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function getAppData() {
+  var ss = getTargetSpreadsheet();
+  return {
+    status: 'ok',
+    rooms: readSheetData(ss, 'Rooms'),
+    bookings: readSheetData(ss, 'Bookings'),
+    users: readSheetData(ss, 'Users')
+  };
+}
+
+function saveAppData(payload) {
+  if (!payload) return { status: 'no_payload' };
+  var ss = getTargetSpreadsheet();
+  if (payload.rooms) {
+    writeSheetData(ss, 'Rooms', ['roomId','name','building','capacity','category','equipment','requireApproval','status'], payload.rooms);
+  }
+  if (payload.bookings) {
+    writeSheetData(ss, 'Bookings', ['id','roomId','date','startPeriod','endPeriod','teacher','department','title','classGroup','equipment','note','status','createdAt'], payload.bookings);
+  }
+  if (payload.users) {
+    writeSheetData(ss, 'Users', ['username','password','fullName','department','role'], payload.users);
+  }
+  return { status: 'saved' };
+}
+
+function readSheetData(ss, sheetName) {
+  if (!ss) {
+    ss = getTargetSpreadsheet();
+  }
+  if (!sheetName) {
+    sheetName = 'Rooms';
+  }
+  var sh = ss.getSheetByName(sheetName);
+  if (!sh) return [];
+  var rows = sh.getDataRange().getValues();
+  if (rows.length === 0) return [];
+  var headers = rows.shift();
+  var result = [];
+  for (var r = 0; r !== rows.length; r++) {
+    var obj = {};
+    for (var c = 0; c !== headers.length; c++) {
+      obj[headers[c]] = rows[r][c];
+    }
+    result.push(obj);
+  }
+  return result;
+}
+
+function writeSheetData(ss, sheetName, headers, items) {
+  if (!ss) {
+    ss = getTargetSpreadsheet();
+  }
+  if (!sheetName || !headers || !items) return;
+  var sh = ss.getSheetByName(sheetName);
+  if (!sh) {
+    sh = ss.insertSheet(sheetName);
+  }
+  sh.clearContents();
+  sh.appendRow(headers);
+  for (var i = 0; i !== items.length; i++) {
+    var item = items[i];
+    var row = [];
+    for (var j = 0; j !== headers.length; j++) {
+      var key = headers[j];
+      var val = item[key];
+      if (Array.isArray(val)) {
+        row.push(val.join(', '));
+      } else if (val === undefined || val === null) {
+        row.push('');
+      } else {
+        row.push(val);
+      }
+    }
+    sh.appendRow(row);
+  }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL 1: CREATE / EDIT BOOKING -->
+  <div id="modal-booking" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-2xl max-w-xl w-full max-h-[92vh] overflow-y-auto shadow-xl border border-slate-200">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">แบบฟอร์มขอจองใช้ห้องเรียน / ห้องปฏิบัติการ</h3>
+          <p class="text-xs text-slate-500">ระบบตรวจสอบตารางชนกันอัตโนมัติแบบเรียลไทม์</p>
+        </div>
+        <button type="button" id="btn-close-booking-modal" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-booking" class="p-5 space-y-4 text-xs">
+        <div id="booking-conflict-alert" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-medium"></div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label for="book-room" class="block font-semibold text-slate-700 mb-1">เลือกห้องที่ต้องการจอง <span class="text-rose-500">*</span></label>
+            <select id="book-room" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+          </div>
+          <div>
+            <label for="book-date" class="block font-semibold text-slate-700 mb-1">วันที่ใช้งาน <span class="text-rose-500">*</span></label>
+            <input type="date" id="book-date" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label for="book-start-period" class="block font-semibold text-slate-700 mb-1">ตั้งแต่คาบเรียนที่ <span class="text-rose-500">*</span></label>
+            <select id="book-start-period" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+          </div>
+          <div>
+            <label for="book-end-period" class="block font-semibold text-slate-700 mb-1">ถึงคาบเรียนที่ <span class="text-rose-500">*</span></label>
+            <select id="book-end-period" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label for="book-teacher" class="block font-semibold text-slate-700 mb-1">ชื่อ-นามสกุล ครูผู้จอง <span class="text-rose-500">*</span></label>
+            <input type="text" id="book-teacher" required placeholder="เช่น อ.สมศรี รักการสอน" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="book-department" class="block font-semibold text-slate-700 mb-1">กลุ่มสาระการเรียนรู้ / ฝ่าย <span class="text-rose-500">*</span></label>
+            <select id="book-department" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="แผนกวิชาเทคนิคคอมพิวเตอร์ / เทคโนโลยีสารสนเทศ">แผนกวิชาเทคนิคคอมพิวเตอร์ / เทคโนโลยีสารสนเทศ</option>
+              <option value="แผนกวิชาช่างไฟฟ้ากำลัง">แผนกวิชาช่างไฟฟ้ากำลัง</option>
+              <option value="แผนกวิชาอิเล็กทรอนิกส์">แผนกวิชาอิเล็กทรอนิกส์</option>
+              <option value="แผนกวิชาช่างยนต์">แผนกวิชาช่างยนต์</option>
+              <option value="แผนกวิชาช่างกลโรงงาน">แผนกวิชาช่างกลโรงงาน</option>
+              <option value="แผนกวิชาช่างเชื่อมโลหะ">แผนกวิชาช่างเชื่อมโลหะ</option>
+              <option value="แผนกวิชาการบัญชี / คอมพิวเตอร์ธุรกิจ">แผนกวิชาการบัญชี / คอมพิวเตอร์ธุรกิจ</option>
+              <option value="แผนกวิชาสามัญสัมพันธ์">แผนกวิชาสามัญสัมพันธ์</option>
+              <option value="ฝ่ายบริหารทรัพยากร / งานอาคารสถานที่">ฝ่ายบริหารทรัพยากร / งานอาคารสถานที่</option>
+              <option value="ฝ่ายวิชาการ / พัฒนากิจการนักเรียนนักศึกษา">ฝ่ายวิชาการ / พัฒนากิจการนักเรียนนักศึกษา</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          <div class="sm:col-span-2">
+            <label for="book-title" class="block font-semibold text-slate-700 mb-1">รหัสวิชา / ชื่อกิจกรรม <span class="text-rose-500">*</span></label>
+            <input type="text" id="book-title" required placeholder="เช่น ว31101 การทดลองเคมีเบื้องต้น หรือ ประชุมระดับชั้น" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="book-class" class="block font-semibold text-slate-700 mb-1">ชั้นเรียน / ผู้เข้าร่วม <span class="text-rose-500">*</span></label>
+            <input type="text" id="book-class" required placeholder="เช่น ม.4/1 (38 คน)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <div>
+          <span class="block font-semibold text-slate-700 mb-1.5">อุปกรณ์โสตฯ / สิ่งอำนวยความสะดวกที่ต้องการใช้เพิ่มเติม</span>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer">
+              <input type="checkbox" name="book-equip" value="ไมโครโฟนไร้สาย" class="accent-indigo-600 rounded" />
+              <span>ไมโครโฟนไร้สาย</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer">
+              <input type="checkbox" name="book-equip" value="โปรเจคเตอร์ / จออัจฉริยะ" class="accent-indigo-600 rounded" checked />
+              <span>โปรเจคเตอร์ / จอ Smart TV</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer">
+              <input type="checkbox" name="book-equip" value="ชุดทดลองปฏิบัติการ" class="accent-indigo-600 rounded" />
+              <span>ชุดทดลองปฏิบัติการ</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer">
+              <input type="checkbox" name="book-equip" value="สายแปลง HDMI / Type-C" class="accent-indigo-600 rounded" />
+              <span>สายแปลง HDMI / Type-C</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer">
+              <input type="checkbox" name="book-equip" value="กล้องเว็บแคม / ระบบประชุม" class="accent-indigo-600 rounded" />
+              <span>กล้องประชุมออนไลน์</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer">
+              <input type="checkbox" name="book-equip" value="เจ้าหน้าที่โสตฯ ช่วยดูแล" class="accent-indigo-600 rounded" />
+              <span>เจ้าหน้าที่โสตฯ ดูแล</span>
+            </label>
+          </div>
+        </div>
+
+        <input type="hidden" id="book-edit-id" value="" />
+        <div id="book-status-wrapper" class="hidden">
+          <label for="book-status-select" class="block font-semibold text-slate-700 mb-1">สถานะการอนุมัติ (สำหรับผู้ดูแลระบบ)</label>
+          <select id="book-status-select" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-semibold">
+            <option value="APPROVED">อนุมัติแล้ว (APPROVED)</option>
+            <option value="PENDING">รออนุมัติ (PENDING)</option>
+            <option value="REJECTED">ไม่อนุมัติ / ยกเลิก (REJECTED)</option>
+          </select>
+        </div>
+        <div>
+          <label for="book-note" class="block font-semibold text-slate-700 mb-1">หมายเหตุเพิ่มเติมถึงฝ่ายอาคารสถานที่</label>
+          <textarea id="book-note" rows="2" placeholder="ระบุความต้องการพิเศษ เช่น ขอเปิดแอร์ล่วงหน้า 15 นาที หรือจัดโต๊ะแบบกลุ่ม..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+          <button type="button" id="btn-cancel-booking-modal" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50">
+            ยกเลิก
+          </button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm">
+            ยืนยันการจองห้อง
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 2: BOOKING SLIP DETAIL / PRINT -->
+  <div id="modal-detail" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-xl border border-slate-200 overflow-hidden">
+      <div class="p-5 bg-indigo-600 text-white flex items-center justify-between no-print">
+        <div>
+          <span id="detail-id-badge" class="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500">BK-000</span>
+          <h3 id="detail-title" class="text-base font-bold mt-1">รายละเอียดใบจองห้อง</h3>
+        </div>
+        <button type="button" id="btn-close-detail-modal" class="p-1.5 rounded-lg text-indigo-100 hover:text-white hover:bg-indigo-500">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div id="detail-body-content" class="p-5 space-y-3 text-xs">
+        <!-- Populated by JS -->
+      </div>
+
+      <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 no-print">
+        <div id="detail-admin-actions" class="flex items-center gap-2"></div>
+        <div class="flex items-center gap-2 ml-auto">
+          <button type="button" id="btn-edit-booking-from-detail" class="px-3.5 py-2 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1.5">
+            <i data-lucide="pencil" class="w-4 h-4"></i>
+            <span>แก้ไขข้อมูล</span>
+          </button>
+          <button type="button" id="btn-print-slip" class="px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5">
+            <i data-lucide="printer" class="w-4 h-4"></i>
+            <span>พิมพ์ใบจอง</span>
+          </button>
+          <button type="button" id="btn-delete-booking" class="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold flex items-center gap-1.5">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+            <span>ยกเลิกการจอง</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: ADD NEW ROOM -->
+  <div id="modal-add-room" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-xl border border-slate-200 overflow-hidden">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">เพิ่มห้องเรียน / ห้องปฏิบัติการใหม่</h3>
+          <p class="text-xs text-slate-500">เพิ่มห้องเข้าสู่ระบบตารางการจองของโรงเรียน</p>
+        </div>
+        <button type="button" id="btn-close-add-room" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form id="form-add-room" class="p-5 space-y-3.5 text-xs">
+        <div>
+          <label for="new-room-name" class="block font-semibold text-slate-700 mb-1">ชื่อห้อง / หมายเลขห้อง <span class="text-rose-500">*</span></label>
+          <input type="text" id="new-room-name" required placeholder="เช่น ห้องปฏิบัติการหุ่นยนต์ AI (4302)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="new-room-building" class="block font-semibold text-slate-700 mb-1">อาคาร / ชั้น <span class="text-rose-500">*</span></label>
+            <input type="text" id="new-room-building" required placeholder="เช่น อาคาร 4 ชั้น 3" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800" />
+          </div>
+          <div>
+            <label for="new-room-capacity" class="block font-semibold text-slate-700 mb-1">ความจุ (ที่นั่ง) <span class="text-rose-500">*</span></label>
+            <input type="number" id="new-room-capacity" required min="5" max="1000" value="40" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800" />
+          </div>
+        </div>
+        <div>
+          <label for="new-room-category" class="block font-semibold text-slate-700 mb-1">ประเภทห้อง <span class="text-rose-500">*</span></label>
+          <select id="new-room-category" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800">
+            <option value="ห้องปฏิบัติการคอมพิวเตอร์">ห้องปฏิบัติการคอมพิวเตอร์</option>
+            <option value="ห้องปฏิบัติการวิทยาศาสตร์">ห้องปฏิบัติการวิทยาศาสตร์</option>
+            <option value="ห้องประชุม / โสตทัศนศึกษา">ห้องประชุม / โสตทัศนศึกษา</option>
+            <option value="ห้องสมุด / ศูนย์การเรียนรู้">ห้องสมุด / ศูนย์การเรียนรู้</option>
+            <option value="ห้องดนตรี / ศิลปะ / กีฬา">ห้องดนตรี / ศิลปะ / กีฬา</option>
+          </select>
+        </div>
+        <div>
+          <label for="new-room-equip" class="block font-semibold text-slate-700 mb-1">อุปกรณ์ประจำห้อง (คั่นด้วยจุลภาค ,)</label>
+          <input type="text" id="new-room-equip" placeholder="เช่น คอมพิวเตอร์ 40 เครื่อง, จออัจฉริยะ, แอร์" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800" />
+        </div>
+        <input type="hidden" id="edit-room-id" value="" />
+        <div>
+          <label for="new-room-status" class="block font-semibold text-slate-700 mb-1">สถานะห้องเรียน</label>
+          <select id="new-room-status" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-semibold">
+            <option value="ACTIVE">เปิดใช้งานปกติ (ACTIVE)</option>
+            <option value="MAINTENANCE">ปิดปรับปรุง / ซ่อมบำรุง (MAINTENANCE)</option>
+          </select>
+        </div>
+        <label class="flex items-center gap-2 pt-1 cursor-pointer">
+          <input type="checkbox" id="new-room-require-approval" class="w-4 h-4 accent-indigo-600 rounded" />
+          <span class="font-medium text-slate-700">ต้องได้รับการอนุมัติจากผู้ดูแลก่อนใช้งานทุกครั้ง</span>
+        </label>
+        <div class="pt-3 flex justify-end gap-2 border-t border-slate-100">
+          <button type="button" id="btn-cancel-add-room" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold">ยกเลิก</button>
+          <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">บันทึกห้องใหม่</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 4: AUTHENTICATION (LOGIN / REGISTER / SWITCH ACCOUNT) -->
+  <div id="modal-auth" class="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs hidden items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="p-5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center">
+            <i data-lucide="key-round" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold leading-tight">ลงชื่อเข้าใช้งานระบบโรงเรียน</h3>
+            <p class="text-[11px] text-indigo-100">ยืนยันตัวตนสำหรับครู บุคลากร และผู้ดูแลระบบ</p>
+          </div>
+        </div>
+        <button type="button" id="btn-close-auth-modal" class="p-1.5 rounded-lg text-indigo-100 hover:text-white hover:bg-white/10">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Auth Mode Switch Tabs -->
+      <div class="grid grid-cols-3 bg-slate-100 p-1 m-4 rounded-xl text-xs font-semibold gap-1">
+        <button type="button" id="tab-auth-login" class="py-2 rounded-lg bg-white text-indigo-600 shadow-2xs transition">
+          เข้าสู่ระบบ (Login)
+        </button>
+        <button type="button" id="tab-auth-register" class="py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">
+          ลงทะเบียนบุคลากรใหม่
+        </button>
+        <button type="button" id="tab-auth-forgot" class="py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">
+          ลืมรหัสผ่าน
+        </button>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <form id="form-login" class="px-5 pb-5 space-y-3.5 text-xs">
+        <div id="login-error-alert" class="hidden p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-medium"></div>
+
+        <div>
+          <label for="login-username" class="block font-semibold text-slate-700 mb-1">ชื่อผู้ใช้ / รหัสบุคลากร / อีเมลโรงเรียน <span class="text-rose-500">*</span></label>
+          <input type="text" id="login-username" required placeholder="เช่น teacher01 หรือ admin" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label for="login-password" class="block font-semibold text-slate-700">รหัสผ่าน (Password) <span class="text-rose-500">*</span></label>
+            <button type="button" id="btn-goto-forgot-pw" class="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 underline">
+              ลืมรหัสผ่าน?
+            </button>
+          </div>
+          <input type="password" id="login-password" required placeholder="••••••••" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm transition flex items-center justify-center gap-1.5">
+          <i data-lucide="log-in" class="w-4 h-4"></i>
+          <span>เข้าสู่ระบบ</span>
+        </button>
+
+
+      </form>
+
+      <!-- REGISTER FORM -->
+      <form id="form-register" class="px-5 pb-5 space-y-3 text-xs hidden">
+        <div id="register-error-alert" class="hidden p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-medium"></div>
+
+        <div>
+          <label for="reg-fullname" class="block font-semibold text-slate-700 mb-1">คำนำหน้าและชื่อ-นามสกุล <span class="text-rose-500">*</span></label>
+          <input type="text" id="reg-fullname" required placeholder="เช่น อ.นภัสสร สอนดี" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label for="reg-username" class="block font-semibold text-slate-700 mb-1">ชื่อผู้ใช้ (Username) <span class="text-rose-500">*</span></label>
+            <input type="text" id="reg-username" required placeholder="เช่น teacher05" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800" />
+          </div>
+          <div>
+            <label for="reg-password" class="block font-semibold text-slate-700 mb-1">รหัสผ่าน <span class="text-rose-500">*</span></label>
+            <input type="password" id="reg-password" required placeholder="ตั้งรหัสผ่าน" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800" />
+          </div>
+        </div>
+
+        <div>
+          <label for="reg-department" class="block font-semibold text-slate-700 mb-1">กลุ่มสาระการเรียนรู้ / ฝ่าย <span class="text-rose-500">*</span></label>
+          <select id="reg-department" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800">
+            <option value="แผนกวิชาเทคนิคคอมพิวเตอร์ / เทคโนโลยีสารสนเทศ">แผนกวิชาเทคนิคคอมพิวเตอร์ / เทคโนโลยีสารสนเทศ</option>
+            <option value="แผนกวิชาช่างไฟฟ้ากำลัง">แผนกวิชาช่างไฟฟ้ากำลัง</option>
+            <option value="แผนกวิชาอิเล็กทรอนิกส์">แผนกวิชาอิเล็กทรอนิกส์</option>
+            <option value="แผนกวิชาช่างยนต์">แผนกวิชาช่างยนต์</option>
+            <option value="แผนกวิชาช่างกลโรงงาน">แผนกวิชาช่างกลโรงงาน</option>
+            <option value="แผนกวิชาช่างเชื่อมโลหะ">แผนกวิชาช่างเชื่อมโลหะ</option>
+            <option value="แผนกวิชาการบัญชี / คอมพิวเตอร์ธุรกิจ">แผนกวิชาการบัญชี / คอมพิวเตอร์ธุรกิจ</option>
+            <option value="แผนกวิชาสามัญสัมพันธ์">แผนกวิชาสามัญสัมพันธ์</option>
+            <option value="ฝ่ายบริหารทรัพยากร / งานอาคารสถานที่">ฝ่ายบริหารทรัพยากร / งานอาคารสถานที่</option>
+            <option value="ฝ่ายวิชาการ / พัฒนากิจการนักเรียนนักศึกษา">ฝ่ายวิชาการ / พัฒนากิจการนักเรียนนักศึกษา</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="reg-role" class="block font-semibold text-slate-700 mb-1">สิทธิ์การใช้งาน</label>
+          <select id="reg-role" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800">
+            <option value="teacher">ครู / บุคลากรทางการศึกษา</option>
+          </select>
+        </div>
+
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm transition">
+          สร้างบัญชีและเข้าสู่ระบบ
+        </button>
+      </form>
+
+      <!-- FORGOT PASSWORD / RESET PASSWORD FORM -->
+      <form id="form-forgot-password" class="px-5 pb-5 space-y-3 text-xs hidden">
+        <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 space-y-1">
+          <div class="font-bold flex items-center gap-1.5">
+            <i data-lucide="shield-alert" class="w-4 h-4 text-amber-600"></i>
+            <span>ระบบกู้คืนและตั้งรหัสผ่านใหม่ (วิทยาลัยการอาชีพสระบุรี)</span>
+          </div>
+          <p class="text-[11px] text-amber-800">กรอกชื่อผู้ใช้ (Username) พร้อมยืนยันชื่อ-นามสกุล หรือแผนกวิชาที่สังกัดเพื่อตั้งรหัสผ่านใหม่ได้ทันที</p>
+        </div>
+
+        <div id="forgot-error-alert" class="hidden p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-medium"></div>
+        <div id="forgot-success-alert" class="hidden p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-medium"></div>
+
+        <div>
+          <label for="forgot-username" class="block font-semibold text-slate-700 mb-1">ชื่อผู้ใช้ (Username) ที่ต้องการรีเซ็ต <span class="text-rose-500">*</span></label>
+          <input type="text" id="forgot-username" required placeholder="เช่น teacher01 หรือรหัสบุคลากร" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <div>
+          <label for="forgot-department" class="block font-semibold text-slate-700 mb-1">ยืนยันแผนกวิชา / ฝ่ายที่สังกัด <span class="text-rose-500">*</span></label>
+          <select id="forgot-department" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800">
+            <option value="แผนกวิชาเทคนิคคอมพิวเตอร์ / เทคโนโลยีสารสนเทศ">แผนกวิชาเทคนิคคอมพิวเตอร์ / เทคโนโลยีสารสนเทศ</option>
+            <option value="แผนกวิชาช่างไฟฟ้ากำลัง">แผนกวิชาช่างไฟฟ้ากำลัง</option>
+            <option value="แผนกวิชาอิเล็กทรอนิกส์">แผนกวิชาอิเล็กทรอนิกส์</option>
+            <option value="แผนกวิชาช่างยนต์">แผนกวิชาช่างยนต์</option>
+            <option value="แผนกวิชาช่างกลโรงงาน">แผนกวิชาช่างกลโรงงาน</option>
+            <option value="แผนกวิชาช่างเชื่อมโลหะ">แผนกวิชาช่างเชื่อมโลหะ</option>
+            <option value="แผนกวิชาการบัญชี / คอมพิวเตอร์ธุรกิจ">แผนกวิชาการบัญชี / คอมพิวเตอร์ธุรกิจ</option>
+            <option value="แผนกวิชาสามัญสัมพันธ์">แผนกวิชาสามัญสัมพันธ์</option>
+            <option value="ฝ่ายบริหารทรัพยากร / งานอาคารสถานที่">ฝ่ายบริหารทรัพยากร / งานอาคารสถานที่</option>
+            <option value="ฝ่ายวิชาการ / พัฒนากิจการนักเรียนนักศึกษา">ฝ่ายวิชาการ / พัฒนากิจการนักเรียนนักศึกษา</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label for="forgot-new-password" class="block font-semibold text-slate-700 mb-1">รหัสผ่านใหม่ <span class="text-rose-500">*</span></label>
+            <input type="password" id="forgot-new-password" required placeholder="ตั้งรหัสผ่านใหม่" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800" />
+          </div>
+          <div>
+            <label for="forgot-confirm-password" class="block font-semibold text-slate-700 mb-1">ยืนยันรหัสผ่านใหม่ <span class="text-rose-500">*</span></label>
+            <input type="password" id="forgot-confirm-password" required placeholder="กรอกรหัสผ่านอีกครั้ง" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800" />
+          </div>
+        </div>
+
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-sm transition flex items-center justify-center gap-1.5">
+          <i data-lucide="key" class="w-4 h-4"></i>
+          <span>ยืนยันการตั้งรหัสผ่านใหม่</span>
+        </button>
+
+        <div class="text-center pt-1">
+          <button type="button" id="btn-back-to-login" class="text-[11px] font-semibold text-slate-500 hover:text-indigo-600">
+            &larr; กลับไปหน้าเข้าสู่ระบบ
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 5: ADMIN USER EDITOR -->
+  <div id="modal-edit-user" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-xl border border-slate-200 overflow-hidden">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h3 id="modal-user-title" class="text-base font-bold text-slate-900">แก้ไขข้อมูลบุคลากร / ผู้ใช้งาน</h3>
+          <p class="text-xs text-slate-500">จัดการชื่อ-นามสกุล กลุ่มสาระฯ รหัสผ่าน และสิทธิ์ผู้ดูแลระบบ</p>
+        </div>
+        <button type="button" id="btn-close-edit-user" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form id="form-edit-user" class="p-5 space-y-3.5 text-xs">
+        <input type="hidden" id="edit-user-original-username" value="" />
+        <div>
+          <label for="edit-user-fullname" class="block font-semibold text-slate-700 mb-1">คำนำหน้าและชื่อ-นามสกุล <span class="text-rose-500">*</span></label>
+          <input type="text" id="edit-user-fullname" required placeholder="เช่น อ.กิตติพงศ์ พัฒนาวิทย์" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="edit-user-username" class="block font-semibold text-slate-700 mb-1">Username <span class="text-rose-500">*</span></label>
+            <input type="text" id="edit-user-username" required placeholder="เช่น teacher01" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800" />
+          </div>
+          <div>
+            <label for="edit-user-password" class="block font-semibold text-slate-700 mb-1">รหัสผ่าน <span class="text-rose-500">*</span></label>
+            <input type="text" id="edit-user-password" placeholder="เช่น 1234" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800" />
+          </div>
+        </div>
+        <div>
+          <label for="edit-user-department" class="block font-semibold text-slate-700 mb-1">กลุ่มสาระการเรียนรู้ / ฝ่าย <span class="text-rose-500">*</span></label>
+          <select id="edit-user-department" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800">
+            <option value="แผนกวิชาเทคนิคคอมพิวเตอร์ / เทคโนโลยีสารสนเทศ">แผนกวิชาเทคนิคคอมพิวเตอร์ / เทคโนโลยีสารสนเทศ</option>
+            <option value="แผนกวิชาช่างไฟฟ้ากำลัง">แผนกวิชาช่างไฟฟ้ากำลัง</option>
+            <option value="แผนกวิชาอิเล็กทรอนิกส์">แผนกวิชาอิเล็กทรอนิกส์</option>
+            <option value="แผนกวิชาช่างยนต์">แผนกวิชาช่างยนต์</option>
+            <option value="แผนกวิชาช่างกลโรงงาน">แผนกวิชาช่างกลโรงงาน</option>
+            <option value="แผนกวิชาช่างเชื่อมโลหะ">แผนกวิชาช่างเชื่อมโลหะ</option>
+            <option value="แผนกวิชาการบัญชี / คอมพิวเตอร์ธุรกิจ">แผนกวิชาการบัญชี / คอมพิวเตอร์ธุรกิจ</option>
+            <option value="แผนกวิชาสามัญสัมพันธ์">แผนกวิชาสามัญสัมพันธ์</option>
+            <option value="ฝ่ายบริหารทรัพยากร / งานอาคารสถานที่">ฝ่ายบริหารทรัพยากร / งานอาคารสถานที่</option>
+            <option value="ฝ่ายวิชาการ / พัฒนากิจการนักเรียนนักศึกษา">ฝ่ายวิชาการ / พัฒนากิจการนักเรียนนักศึกษา</option>
+          </select>
+        </div>
+        <div>
+          <label for="edit-user-role" class="block font-semibold text-slate-700 mb-1">สิทธิ์การใช้งาน</label>
+          <select id="edit-user-role" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-semibold">
+            <option value="teacher">ครู / บุคลากร (teacher)</option>
+            <option value="admin">ผู้ดูแลระบบ / ฝ่ายอาคารสถานที่ (admin)</option>
+          </select>
+        </div>
+        <div class="pt-3 flex justify-end gap-2 border-t border-slate-100">
+          <button type="button" id="btn-cancel-edit-user" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold">ยกเลิก</button>
+          <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">บันทึกข้อมูลบุคลากร</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 space-y-2 no-print"></div>
+
+  <script>
+    // --- SCHOOL PERIODS CONFIGURATION ---
+    const SCHOOL_PERIODS = [
+      { id: 1, name: 'คาบ 1', time: '08:30 - 09:20' },
+      { id: 2, name: 'คาบ 2', time: '09:20 - 10:10' },
+      { id: 3, name: 'คาบ 3', time: '10:20 - 11:10' },
+      { id: 4, name: 'คาบ 4', time: '11:10 - 12:00' },
+      { id: 5, name: 'พักเที่ยง', time: '12:00 - 13:00' },
+      { id: 6, name: 'คาบ 5', time: '13:00 - 13:50' },
+      { id: 7, name: 'คาบ 6', time: '13:50 - 14:40' },
+      { id: 8, name: 'คาบ 7', time: '14:50 - 15:40' },
+      { id: 9, name: 'คาบ 8 / หลังเลิกเรียน', time: '15:40 - 16:30' }
+    ];
+
+    const STORAGE_KEY = 'sicec_saraburi_room_booking_v2';
+
+    function getTodayISO() {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function addDaysISO(baseISO, offset) {
+      const [y, m, d] = baseISO.split('-').map(Number);
+      const dt = new Date(y, m - 1, d + offset);
+      const yyyy = dt.getFullYear();
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
+      const dd = String(dt.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function formatThaiDate(isoStr) {
+      if (!isoStr) return '';
+      const [y, m, d] = isoStr.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      return dateObj.toLocaleDateString('th-TH', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    }
+
+    // --- INITIAL DEMO DATA (วิทยาลัยการอาชีพสระบุรี) ---
+    function createDefaultData() {
+      const today = getTodayISO();
+      const tomorrow = addDaysISO(today, 1);
+      return {
+        autoApproveGeneral: true,
+        users: [
+          {
+            username: 'teacher01',
+            password: '1234',
+            fullName: 'อ.กิตติพงศ์ พัฒนาวิทย์',
+            department: 'แผนกวิชาเทคนิคคอมพิวเตอร์ / เทคโนโลยีสารสนเทศ',
+            role: 'teacher'
+          },
+          {
+            username: 'teacher02',
+            password: '1234',
+            fullName: 'อ.เมธาวี สามัญศึกษา',
+            department: 'แผนกวิชาสามัญสัมพันธ์',
+            role: 'teacher'
+          },
+          {
+            username: 'teacher03',
+            password: '1234',
+            fullName: 'อ.ปาริชาติ วงศ์ไฟฟ้า',
+            department: 'แผนกวิชาช่างไฟฟ้ากำลัง',
+            role: 'teacher'
+          },
+          {
+            username: 'teacher04',
+            password: '1234',
+            fullName: 'อ.คมสันต์ ช่างกล',
+            department: 'แผนกวิชาช่างกลโรงงาน',
+            role: 'teacher'
+          },
+          {
+            username: 'admin',
+            password: '1234',
+            fullName: 'อ.วิชัย บริหารทั่วไป',
+            department: 'ฝ่ายบริหารทรัพยากร / งานอาคารสถานที่',
+            role: 'admin'
+          }
+        ],
+        rooms: [
+          {
+            id: 'RM-101',
+            name: 'ห้องปฏิบัติการคอมพิวเตอร์และเครือข่าย 1',
+            building: 'อาคารเทคนิคคอมพิวเตอร์ ชั้น 2',
+            capacity: 45,
+            category: 'ห้องปฏิบัติการคอมพิวเตอร์',
+            equipment: ['คอมพิวเตอร์ 45 เครื่อง', 'จออัจฉริยะ 86 นิ้ว', 'อินเทอร์เน็ตความเร็วสูง', 'ไมโครโฟน'],
+            requireApproval: false,
+            status: 'ACTIVE'
+          },
+          {
+            id: 'RM-102',
+            name: 'ห้องปฏิบัติการระบบควบคุมอัตโนมัติและ PLC',
+            building: 'อาคารแผนกวิชาช่างไฟฟ้ากำลัง ชั้น 2',
+            capacity: 40,
+            category: 'ห้องปฏิบัติการวิทยาศาสตร์',
+            equipment: ['ชุดฝึก PLC มาตรฐาน', 'ชุดทดลองวงจรไฟฟ้า', 'โปรเจคเตอร์', 'ชุดอุปกรณ์เซฟตี้'],
+            requireApproval: false,
+            status: 'ACTIVE'
+          },
+          {
+            id: 'RM-103',
+            name: 'หอประชุมใหญ่ วิทยาลัยการอาชีพสระบุรี',
+            building: 'อาคารหอประชุมเฉลิมพระเกียรติ',
+            capacity: 300,
+            category: 'ห้องประชุม / โสตทัศนศึกษา',
+            equipment: ['จอ LED Wall', 'ชุดเครื่องเสียงเวที', 'ไมค์ลอย 6 ตัว', 'ไฟเวที'],
+            requireApproval: true,
+            status: 'ACTIVE'
+          },
+          {
+            id: 'RM-104',
+            name: 'ห้องประชุมโสตทัศนศึกษา (AV & VDO Conference)',
+            building: 'อาคารอำนวยการ ชั้น 2',
+            capacity: 80,
+            category: 'ห้องประชุม / โสตทัศนศึกษา',
+            equipment: ['โปรเจคเตอร์เลเซอร์', 'ระบบประชุมทางไกล', 'ไมค์ประชุมตั้งโต๊ะ'],
+            requireApproval: true,
+            status: 'ACTIVE'
+          },
+          {
+            id: 'RM-105',
+            name: 'ศูนย์วิทยบริการและห้องสมุดดิจิทัล (Co-Learning)',
+            building: 'อาคารศูนย์วิทยบริการ ชั้น 1',
+            capacity: 60,
+            category: 'ห้องสมุด / ศูนย์การเรียนรู้',
+            equipment: ['Smart TV 75 นิ้ว', 'กระดานไวท์บอร์ดกระจก', 'โซนค้นคว้ากลุ่มย่อย'],
+            requireApproval: false,
+            status: 'ACTIVE'
+          },
+          {
+            id: 'RM-106',
+            name: 'ห้องปฏิบัติการเขียนแบบวิศวกรรม CAD/CAM',
+            building: 'อาคารแผนกวิชาช่างกลโรงงาน ชั้น 2',
+            capacity: 40,
+            category: 'ห้องปฏิบัติการคอมพิวเตอร์',
+            equipment: ['คอมพิวเตอร์กราฟิก 40 เครื่อง', 'ซอฟต์แวร์ AutoCAD/SolidWorks', 'โปรเจคเตอร์'],
+            requireApproval: false,
+            status: 'ACTIVE'
+          },
+          {
+            id: 'RM-107',
+            name: 'ห้องปฏิบัติการคอมพิวเตอร์ธุรกิจและการบัญชี',
+            building: 'อาคารพณิชยการ ชั้น 3',
+            capacity: 45,
+            category: 'ห้องปฏิบัติการคอมพิวเตอร์',
+            equipment: ['คอมพิวเตอร์ 45 เครื่อง', 'โปรแกรมสำเร็จรูปทางบัญชี', 'จอ Smart TV'],
+            requireApproval: false,
+            status: 'ACTIVE'
+          }
+        ],
+        bookings: [
+          {
+            id: 'BK-2401',
+            roomId: 'RM-101',
+            date: today,
+            startPeriod: 1,
+            endPeriod: 2,
+            teacher: 'อ.กิตติพงศ์ พัฒนาวิทย์',
+            department: 'แผนกวิชาเทคนิคคอมพิวเตอร์ / เทคโนโลยีสารสนเทศ',
+            title: '30901-2002 การเขียนโปรแกรมคอมพิวเตอร์และเครือข่าย',
+            classGroup: 'ปวส.1 เทคนิคคอมพิวเตอร์ (40 คน)',
+            equipment: ['โปรเจคเตอร์ / จอ Smart TV', 'ไมโครโฟนไร้สาย'],
+            note: 'ขอเปิดระบบเครือข่ายห้องปฏิบัติการ',
+            status: 'APPROVED',
+            createdAt: '08:00 น.'
+          },
+          {
+            id: 'BK-2402',
+            roomId: 'RM-102',
+            date: today,
+            startPeriod: 3,
+            endPeriod: 4,
+            teacher: 'อ.ปาริชาติ วงศ์ไฟฟ้า',
+            department: 'แผนกวิชาช่างไฟฟ้ากำลัง',
+            title: '20104-2005 การโปรแกรมและควบคุมไฟฟ้าด้วย PLC',
+            classGroup: 'ปวช.3 ช่างไฟฟ้ากำลัง (36 คน)',
+            equipment: ['ชุดทดลองปฏิบัติการ', 'โปรเจคเตอร์ / จอ Smart TV'],
+            note: 'เตรียมชุดฝึก PLC และสายต่อพ่วง',
+            status: 'APPROVED',
+            createdAt: '08:15 น.'
+          },
+          {
+            id: 'BK-2403',
+            roomId: 'RM-103',
+            date: today,
+            startPeriod: 6,
+            endPeriod: 8,
+            teacher: 'อ.สุรศักดิ์ พัฒนาผู้เรียน',
+            department: 'ฝ่ายวิชาการ / พัฒนากิจการนักเรียนนักศึกษา',
+            title: 'โครงการปฐมนิเทศนักศึกษาฝึกงานระบบทวิภาคี',
+            classGroup: 'ระดับชั้น ปวช.3 และ ปวส.2 (250 คน)',
+            equipment: ['ไมโครโฟนไร้สาย', 'โปรเจคเตอร์ / จอ Smart TV', 'เจ้าหน้าที่โสตฯ ดูแล'],
+            note: 'ขอเจ้าหน้าที่โสตฯ สแตนด์บายระบบเสียงตั้งแต่ 12:40 น.',
+            status: 'PENDING',
+            createdAt: '09:10 น.'
+          },
+          {
+            id: 'BK-2404',
+            roomId: 'RM-105',
+            date: today,
+            startPeriod: 6,
+            endPeriod: 7,
+            teacher: 'อ.เมธาวี สามัญศึกษา',
+            department: 'แผนกวิชาสามัญสัมพันธ์',
+            title: '20000-1201 ภาษาอังกฤษเพื่อการสื่อสารในงานอาชีพ',
+            classGroup: 'ปวช.2 การบัญชี (38 คน)',
+            equipment: ['โปรเจคเตอร์ / จอ Smart TV'],
+            note: 'จัดโต๊ะรูปแบบกลุ่มย่อย 6 กลุ่ม',
+            status: 'APPROVED',
+            createdAt: '09:30 น.'
+          },
+          {
+            id: 'BK-2405',
+            roomId: 'RM-106',
+            date: today,
+            startPeriod: 2,
+            endPeriod: 3,
+            teacher: 'อ.คมสันต์ ช่างกล',
+            department: 'แผนกวิชาช่างกลโรงงาน',
+            title: '20102-2004 เขียนแบบเครื่องกลด้วยคอมพิวเตอร์ (CAD)',
+            classGroup: 'ปวช.2 ช่างกลโรงงาน (38 คน)',
+            equipment: ['โปรเจคเตอร์ / จอ Smart TV'],
+            note: '',
+            status: 'APPROVED',
+            createdAt: '09:45 น.'
+          },
+          {
+            id: 'BK-2406',
+            roomId: 'RM-104',
+            date: tomorrow,
+            startPeriod: 3,
+            endPeriod: 4,
+            teacher: 'อ.วิชัย บริหารทั่วไป',
+            department: 'ฝ่ายบริหารทรัพยากร / งานอาคารสถานที่',
+            title: 'ประชุมหัวหน้าแผนกวิชาและคณะกรรมการบริหารวิทยาลัยฯ',
+            classGroup: 'คณะผู้บริหารและหัวหน้าแผนก (45 คน)',
+            equipment: ['ไมโครโฟนไร้สาย', 'กล้องประชุมออนไลน์'],
+            note: '',
+            status: 'PENDING',
+            createdAt: '10:05 น.'
+          }
+        ]
+      };
+    }
+
+    // --- STATE MANAGEMENT ---
+    let state = {
+      currentTab: 'schedule',
+      role: 'teacher',
+      currentUser: {
+        username: 'teacher01',
+        fullName: 'อ.กิตติพงศ์ พัฒนาวิทย์',
+        department: 'แผนกวิชาเทคนิคคอมพิวเตอร์ / เทคโนโลยีสารสนเทศ',
+        role: 'teacher'
+      },
+      selectedDate: getTodayISO(),
+      scheduleCategory: 'ALL',
+      roomSearch: '',
+      roomMinCapacity: 0,
+      bookingSearch: '',
+      bookingStatusFilter: 'ALL',
+      activeDetailBookingId: null,
+      data: { rooms: [], bookings: [], users: [], autoApproveGeneral: true }
+    };
+
+    
+    // ===== SUPABASE DATA LAYER =====
+    const SUPABASE_URL = 'https://hyzaxjkljzebcdwkeuim.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5emF4amtsanplYmNkd2tldWltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ0NjUwMjksImV4cCI6MjExMDA0MTAyOX0._we555ghB4kd-V8cWyEems5hj7d1J39W71XzUNi7mkc';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const toEmail = u => String(u).trim().toLowerCase() + '@sicec.local';
+    const mapIn = {
+      room: r => ({ id:r.id, name:r.name, building:r.building, capacity:r.capacity, category:r.category, equipment:r.equipment||[], requireApproval:r.require_approval, status:r.status }),
+      booking: b => ({ id:b.id, roomId:b.room_id, date:b.date, startPeriod:b.start_period, endPeriod:b.end_period, teacher:b.teacher, department:b.department, title:b.title, classGroup:b.class_group, equipment:b.equipment||[], note:b.note||'', status:b.status, createdAt:b.created_label||'' }),
+      user: p => ({ id:p.id, username:p.username, fullName:p.full_name, department:p.department, role:p.role })
+    };
+    const mapOut = {
+      room: r => ({ id:r.id, name:r.name, building:r.building, capacity:r.capacity, category:r.category, equipment:r.equipment||[], require_approval:!!r.requireApproval, status:r.status }),
+      booking: b => ({ id:b.id, room_id:b.roomId, date:b.date, start_period:b.startPeriod, end_period:b.endPeriod, teacher:b.teacher, department:b.department, title:b.title, classGroup:undefined, class_group:b.classGroup, equipment:b.equipment||[], note:b.note||'', status:b.status, created_label:b.createdAt||'' }),
+      user: u => ({ full_name:u.fullName, department:u.department, role:u.role })
+    };
+    const TABLES = [['rooms','rooms','room'],['bookings','bookings','booking'],['users','profiles','user']];
+    let snap = { rooms:{}, bookings:{}, users:{} };
+    function takeSnapshot() {
+      TABLES.forEach(([k]) => { snap[k] = {}; (state.data[k]||[]).forEach(x => { if (x.id) snap[k][x.id] = JSON.stringify(x); }); });
+    }
+    async function loadRemote() {
+      const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+      const [r, b, u, s] = await Promise.all([
+        sb.from('rooms').select('*').order('id'),
+        sb.from('bookings').select('*').order('date'),
+        isAdmin ? sb.from('profiles').select('*').order('username') : Promise.resolve({ data: [] }),
+        sb.from('settings').select('*').eq('id', 1).maybeSingle()
+      ]);
+      if (r.error || b.error) { showToast('โหลดข้อมูลไม่สำเร็จ: ' + (r.error || b.error).message, 'error'); return; }
+      state.data.rooms = r.data.map(mapIn.room);
+      state.data.bookings = b.data.map(mapIn.booking);
+      state.data.users = (u.data || []).map(mapIn.user);
+      state.data.autoApproveGeneral = s.data ? !!s.data.auto_approve : true;
+      takeSnapshot();
+      renderAll();
+    }
+    async function restoreProfile(uid) {
+      const { data } = await sb.from('profiles').select('*').eq('id', uid).maybeSingle();
+      if (data) {
+        state.currentUser = { username:data.username, fullName:data.full_name, department:data.department, role:data.role };
+        state.role = data.role;
+      }
+      return !!data;
+    }
+    async function initSupabase() {
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session) await restoreProfile(session.user.id);
+        await loadRemote();
+      } catch (e) { showToast('เชื่อมต่อ Supabase ไม่ได้ ตรวจสอบ URL/Key', 'error'); }
+    }
+    let syncChain = Promise.resolve();
+    function saveState() { syncChain = syncChain.then(pushChanges).catch(() => {}); }
+    async function pushChanges() {
+      if (!state.currentUser) return;
+      try {
+        for (const [k, table, t] of TABLES) {
+          const cur = {};
+          (state.data[k] || []).forEach(x => { if (x.id) cur[x.id] = x; });
+          for (const id in snap[k]) if (!cur[id]) {
+            const { error } = await sb.from(table).delete().eq('id', id); if (error) throw error;
+          }
+          for (const id in cur) {
+            if (snap[k][id] === JSON.stringify(cur[id])) continue;
+            const row = mapOut[t](cur[id]); delete row.classGroup;
+            const q = (id in snap[k]) ? sb.from(table).update(row).eq('id', id) : (k === 'users' ? null : sb.from(table).insert(row));
+            if (q) { const { error } = await q; if (error) throw error; }
+          }
+        }
+        if (state.currentUser.role === 'admin') {
+          const { error } = await sb.from('settings').upsert({ id: 1, auto_approve: !!state.data.autoApproveGeneral });
+          if (error) throw error;
+        }
+        await loadRemote();
+      } catch (e) {
+        showToast(e.code === '23P01' ? 'ห้องนี้ถูกจองในช่วงเวลานี้แล้ว (มีผู้จองก่อน)' : 'บันทึกไม่สำเร็จ: ' + (e.message || e), 'error');
+        await loadRemote();
+      }
+    }
+    function loadState() {}
+    function saveUserSession() {}
+
+        // --- TOAST HELPER ---
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const el = document.createElement('div');
+      const bgClass = type === 'error'
+        ? 'bg-rose-600 text-white'
+        : type === 'warning'
+        ? 'bg-amber-600 text-white'
+        : 'bg-slate-900 text-white';
+      el.className = `${bgClass} px-4 py-3 rounded-xl shadow-lg text-xs font-semibold flex items-center gap-2 transition-all`;
+      el.innerHTML = `<span>${message}</span>`;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.remove();
+      }, 3200);
+    }
+
+    // --- CONFLICT CHECKING ---
+    function findConflictingBooking(roomId, date, startP, endP, ignoreBookingId = null) {
+      return state.data.bookings.find(b => {
+        if (b.id === ignoreBookingId) return false;
+        if (b.status === 'REJECTED') return false;
+        if (b.roomId !== roomId || b.date !== date) return false;
+        return Math.max(b.startPeriod, startP) <= Math.min(b.endPeriod, endP);
+      });
+    }
+
+    // --- RENDER DASHBOARD STATS ---
+    function renderSummaryStats() {
+      const activeRooms = state.data.rooms.filter(r => r.status === 'ACTIVE');
+      const dateBookings = state.data.bookings.filter(
+        b => b.date === state.selectedDate && b.status !== 'REJECTED'
+      );
+      const pendingBookings = state.data.bookings.filter(b => b.status === 'PENDING');
+
+      // Calculate free slot rate on selectedDate
+      const totalSlots = activeRooms.length * SCHOOL_PERIODS.length;
+      let occupiedSlots = 0;
+      dateBookings.forEach(b => {
+        occupiedSlots += (b.endPeriod - b.startPeriod + 1);
+      });
+      const freeRate = totalSlots > 0 ? Math.max(0, Math.round(((totalSlots - occupiedSlots) / totalSlots) * 100)) : 100;
+
+      document.getElementById('stat-total-rooms').textContent = `${activeRooms.length} ห้อง`;
+      document.getElementById('stat-today-bookings').textContent = `${dateBookings.length} รายการ`;
+      document.getElementById('stat-pending-bookings').textContent = `${pendingBookings.length} รายการ`;
+      document.getElementById('stat-free-rate').textContent = `${freeRate}%`;
+
+      document.getElementById('badge-total-bookings').textContent = state.data.bookings.filter(b => b.status !== 'REJECTED').length;
+      document.getElementById('badge-pending-count').textContent = pendingBookings.length;
+    }
+
+    // --- RENDER SCHEDULE MATRIX ---
+    function renderScheduleMatrix() {
+      document.getElementById('schedule-date-picker').value = state.selectedDate;
+      document.getElementById('selected-date-label').textContent = formatThaiDate(state.selectedDate);
+
+      // Header row
+      const headerRow = document.getElementById('schedule-header-row');
+      headerRow.innerHTML = `
+        <th class="py-3 px-3.5 font-bold text-slate-800 w-56 sticky left-0 bg-slate-50 z-10 border-r border-slate-200">
+          ห้องเรียน / อาคาร
+        </th>
+        ${SCHOOL_PERIODS.map(p => `
+          <th class="py-2.5 px-2 text-center border-r border-slate-200 min-w-[92px]">
+            <div class="font-bold text-slate-800">${p.name}</div>
+            <div class="text-[10px] font-normal text-slate-500">${p.time}</div>
+          </th>
+        `).join('')}
+      `;
+
+      // Filter rooms
+      const filteredRooms = state.data.rooms.filter(r => {
+        if (state.scheduleCategory !== 'ALL' && r.category !== state.scheduleCategory) return false;
+        return true;
+      });
+
+      const tbody = document.getElementById('schedule-matrix-body');
+      if (filteredRooms.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="${SCHOOL_PERIODS.length + 1}" class="py-8 text-center text-slate-400">
+              ไม่พบห้องในหมวดหมู่ที่เลือก
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filteredRooms.map(room => {
+        const roomBookings = state.data.bookings.filter(
+          b => b.roomId === room.id && b.date === state.selectedDate && b.status !== 'REJECTED'
+        );
+
+        let cellsHtml = '';
+        let p = 1;
+        while (p <= SCHOOL_PERIODS.length) {
+          const booking = roomBookings.find(b => b.startPeriod <= p && b.endPeriod >= p);
+          if (booking) {
+            const span = booking.endPeriod - booking.startPeriod + 1;
+            const isPending = booking.status === 'PENDING';
+            const cardColors = isPending
+              ? 'bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900'
+              : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-900';
+            const badgeText = isPending ? 'รออนุมัติ' : 'อนุมัติแล้ว';
+            const badgeBg = isPending ? 'bg-amber-200/80 text-amber-900' : 'bg-emerald-200/80 text-emerald-900';
+
+            cellsHtml += `
+              <td colspan="${span}" class="p-1.5 border-r border-slate-200 align-top">
+                <button type="button" data-booking-id="${booking.id}" class="btn-view-booking w-full text-left p-2 rounded-lg border ${cardColors} transition shadow-2xs">
+                  <div class="flex items-center justify-between gap-1 mb-0.5">
+                    <span class="font-bold truncate">${booking.title}</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded font-semibold shrink-0 ${badgeBg}">${badgeText}</span>
+                  </div>
+                  <div class="text-[11px] opacity-85 truncate">${booking.teacher} • ${booking.classGroup}</div>
+                </button>
+              </td>
+            `;
+            p = booking.endPeriod + 1;
+          } else {
+            cellsHtml += `
+              <td class="p-1.5 border-r border-slate-200 align-middle">
+                <button type="button" data-room-id="${esc(room.id)}" data-period="${p}" class="btn-quick-slot w-full h-14 rounded-lg border border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/60 text-slate-400 hover:text-indigo-600 transition flex flex-col items-center justify-center gap-0.5 group">
+                  <span class="text-[11px] font-medium group-hover:font-semibold">+ จอง</span>
+                  <span class="text-[9px] text-slate-300 group-hover:text-indigo-400">คาบ ${p === 5 ? 'พัก' : p > 5 ? p - 1 : p}</span>
+                </button>
+              </td>
+            `;
+            p++;
+          }
+        }
+
+        return `
+          <tr class="hover:bg-slate-50/50">
+            <td class="py-3 px-3.5 sticky left-0 bg-white z-10 border-r border-slate-200">
+              <div class="font-bold text-slate-800">${esc(room.name)}</div>
+              <div class="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
+                <span>${esc(room.building)}</span>
+                <span>•</span>
+                <span>${room.capacity} ที่นั่ง</span>
+              </div>
+              ${room.requireApproval ? `<span class="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">ต้องขออนุมัติ</span>` : ''}
+            </td>
+            ${cellsHtml}
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // --- RENDER ROOM DIRECTORY ---
+    function renderRoomsGrid() {
+      const container = document.getElementById('rooms-grid-container');
+      const query = state.roomSearch.trim().toLowerCase();
+      const minCap = Number(state.roomMinCapacity) || 0;
+
+      const rooms = state.data.rooms.filter(r => {
+        if (r.capacity < minCap) return false;
+        if (!query) return true;
+        const haystack = `${esc(r.name)} ${esc(r.building)} ${esc(r.category)} ${r.equipment.join(' ')}`.toLowerCase();
+        return haystack.includes(query);
+      });
+
+      if (rooms.length === 0) {
+        container.innerHTML = `<div class="col-span-full py-12 text-center text-slate-400 text-sm">ไม่พบห้องที่ตรงกับเงื่อนไขการค้นหา</div>`;
+        return;
+      }
+
+      container.innerHTML = rooms.map(r => {
+        const todayCount = state.data.bookings.filter(
+          b => b.roomId === r.id && b.date === state.selectedDate && b.status !== 'REJECTED'
+        ).length;
+
+        return `
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col justify-between gap-3 hover:shadow-md transition">
+            <div class="space-y-2">
+              <div class="flex items-start justify-between gap-2">
+                <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">${esc(r.category)}</span>
+                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full ${r.requireApproval ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700'}">
+                  ${r.requireApproval ? 'รออนุมัติก่อนใช้' : 'อนุมัติอัตโนมัติ'}
+                </span>
+              </div>
+              <h3 class="text-sm font-bold text-slate-900">${esc(r.name)}</h3>
+              <p class="text-xs text-slate-500">${esc(r.building)} • รองรับ ${r.capacity} ที่นั่ง</p>
+              <div class="flex flex-wrap gap-1.5 pt-1">
+                ${r.equipment.map(eq => `<span class="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">${eq}</span>`).join('')}
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+              <span class="text-xs text-slate-500">จองวันนี้: <strong class="text-slate-800">${todayCount} รายการ</strong></span>
+              <div class="flex items-center gap-1.5">
+                ${state.role === 'admin' ? `
+                  <button type="button" data-edit-room-id="${esc(r.id)}" class="btn-edit-room px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition">
+                    แก้ไขห้อง
+                  </button>
+                ` : ''}
+                <button type="button" data-book-room-id="${esc(r.id)}" class="btn-book-this-room px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition">
+                  จองห้องนี้
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // --- RENDER BOOKINGS TABLE ---
+    function renderBookingsTable() {
+      const tbody = document.getElementById('bookings-table-body');
+      const q = state.bookingSearch.trim().toLowerCase();
+      const statusFilter = state.bookingStatusFilter;
+
+      const filtered = state.data.bookings.filter(b => {
+        if (statusFilter !== 'ALL' && b.status !== statusFilter) return false;
+        if (!q) return true;
+        const room = state.data.rooms.find(r => r.id === b.roomId);
+        const roomName = room ? room.name : '';
+        const text = `${esc(b.id)} ${esc(b.teacher)} ${esc(b.department)} ${esc(b.title)} ${esc(b.classGroup)} ${esc(roomName)}`.toLowerCase();
+        return text.includes(q);
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-10 text-center text-slate-400">ไม่พบรายการจองที่ค้นหา</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(b => {
+        const room = state.data.rooms.find(r => r.id === b.roomId);
+        const startLabel = SCHOOL_PERIODS.find(p => p.id === b.startPeriod)?.name || `คาบ ${b.startPeriod}`;
+        const endLabel = SCHOOL_PERIODS.find(p => p.id === b.endPeriod)?.name || `คาบ ${b.endPeriod}`;
+        const statusBadge = b.status === 'APPROVED'
+          ? '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">อนุมัติแล้ว</span>'
+          : b.status === 'PENDING'
+          ? '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">รออนุมัติ</span>'
+          : '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-semibold">ยกเลิก/ไม่อนุมัติ</span>';
+
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="py-3 px-4">
+              <div class="font-bold text-indigo-600">${esc(b.id)}</div>
+              <div class="text-slate-500">${b.date}</div>
+            </td>
+            <td class="py-3 px-4 font-semibold text-slate-800">${room ? room.name : b.roomId}</td>
+            <td class="py-3 px-4 text-slate-700">${startLabel} – ${endLabel}</td>
+            <td class="py-3 px-4">
+              <div class="font-semibold text-slate-800">${esc(b.teacher)}</div>
+              <div class="text-slate-500">${esc(b.department)}</div>
+            </td>
+            <td class="py-3 px-4">
+              <div class="font-semibold text-slate-800">${esc(b.title)}</div>
+              <div class="text-slate-500">${esc(b.classGroup)}</div>
+            </td>
+            <td class="py-3 px-4">${statusBadge}</td>
+            <td class="py-3 px-4 text-right space-x-1">
+              ${state.role === 'admin' ? `
+                <button type="button" data-edit-booking-id="${esc(b.id)}" class="btn-edit-booking px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold">
+                  แก้ไข
+                </button>
+              ` : ''}
+              <button type="button" data-booking-id="${esc(b.id)}" class="btn-view-booking px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold">
+                ดูใบจอง
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // --- RENDER ADMIN VIEW ---
+    function renderAdminPanel() {
+      const pendingContainer = document.getElementById('admin-pending-list');
+      const pendingList = state.data.bookings.filter(b => b.status === 'PENDING');
+
+      document.getElementById('setting-auto-approve').checked = !!state.data.autoApproveGeneral;
+
+      if (pendingList.length === 0) {
+        pendingContainer.innerHTML = `
+          <div class="p-8 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center text-slate-500 text-xs">
+            ไม่มีรายการคำขอจองที่ค้างรออนุมัติในขณะนี้
+          </div>
+        `;
+      } else {
+        pendingContainer.innerHTML = pendingList.map(b => {
+          const room = state.data.rooms.find(r => r.id === b.roomId);
+          const startLabel = SCHOOL_PERIODS.find(p => p.id === b.startPeriod)?.name || '';
+          const endLabel = SCHOOL_PERIODS.find(p => p.id === b.endPeriod)?.name || '';
+          return `
+            <div class="p-4 rounded-xl border border-amber-200 bg-amber-50/40 flex flex-wrap items-center justify-between gap-3">
+              <div class="space-y-1 text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded bg-amber-200 text-amber-900 font-bold text-[10px]">${esc(b.id)}</span>
+                  <span class="font-bold text-slate-900">${room ? room.name : b.roomId}</span>
+                </div>
+                <p class="text-slate-700 font-medium">${esc(b.title)} (${esc(b.classGroup)})</p>
+                <p class="text-slate-500">วันที่ ${b.date} • ${startLabel} ถึง ${endLabel} • ผู้ขอ: ${esc(b.teacher)} (${esc(b.department)})</p>
+                ${b.note ? `<p class="text-amber-800">หมายเหตุ: ${esc(b.note)}</p>` : ''}
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" data-approve-id="${esc(b.id)}" class="btn-approve-single px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">
+                  อนุมัติ
+                </button>
+                <button type="button" data-reject-id="${esc(b.id)}" class="btn-reject-single px-3.5 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-semibold">
+                  ไม่อนุมัติ
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Department breakdown
+      const deptCounts = {};
+      state.data.bookings.filter(b => b.status !== 'REJECTED').forEach(b => {
+        deptCounts[b.department] = (deptCounts[b.department] || 0) + 1;
+      });
+      const deptEntries = Object.entries(deptCounts).sort((a, b) => b[1] - a[1]);
+      const deptContainer = document.getElementById('department-stats-list');
+      deptContainer.innerHTML = deptEntries.map(([dept, count]) => `
+        <div class="flex items-center justify-between text-xs py-1 border-b border-slate-200/60 last:border-0">
+          <span class="text-slate-600 truncate pr-2">${dept}</span>
+          <span class="font-bold text-slate-900">${count} ครั้ง</span>
+        </div>
+      `).join('');
+
+      // Render Admin Rooms CRUD Table
+      const roomsTbody = document.getElementById('admin-rooms-tbody');
+      if (roomsTbody) {
+        roomsTbody.innerHTML = state.data.rooms.map(r => `
+          <tr class="hover:bg-slate-50">
+            <td class="py-2.5 px-3 font-bold text-indigo-600">${esc(r.id)}</td>
+            <td class="py-2.5 px-3">
+              <div class="font-bold text-slate-900">${esc(r.name)}</div>
+              <div class="text-slate-500">${esc(r.building)}</div>
+            </td>
+            <td class="py-2.5 px-3">
+              <div class="font-medium text-slate-800">${esc(r.category)}</div>
+              <div class="text-slate-500">${r.capacity} ที่นั่ง</div>
+            </td>
+            <td class="py-2.5 px-3 max-w-xs">
+              <div class="truncate text-slate-600">${(r.equipment || []).join(', ')}</div>
+            </td>
+            <td class="py-2.5 px-3">
+              <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${r.requireApproval ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">
+                ${r.requireApproval ? 'ต้องขออนุมัติ' : 'อนุมัติอัตโนมัติ'}
+              </span>
+            </td>
+            <td class="py-2.5 px-3">
+              <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${r.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">
+                ${r.status === 'ACTIVE' ? 'เปิดใช้งาน' : 'ปิดซ่อมบำรุง'}
+              </span>
+            </td>
+            <td class="py-2.5 px-3 text-right space-x-1 whitespace-nowrap">
+              <button type="button" data-edit-room-id="${esc(r.id)}" class="btn-edit-room px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold">แก้ไข</button>
+              <button type="button" data-delete-room-id="${esc(r.id)}" class="btn-delete-room px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold">ลบ</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      // Render Admin Bookings CRUD Table
+      const bookingsTbody = document.getElementById('admin-bookings-tbody');
+      if (bookingsTbody) {
+        bookingsTbody.innerHTML = state.data.bookings.map(b => {
+          const room = state.data.rooms.find(r => r.id === b.roomId);
+          const sName = SCHOOL_PERIODS.find(p => p.id === b.startPeriod)?.name || `คาบ ${b.startPeriod}`;
+          const eName = SCHOOL_PERIODS.find(p => p.id === b.endPeriod)?.name || `คาบ ${b.endPeriod}`;
+          const badge = b.status === 'APPROVED'
+            ? '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">อนุมัติแล้ว</span>'
+            : b.status === 'PENDING'
+            ? '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">รออนุมัติ</span>'
+            : '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-semibold">ไม่อนุมัติ/ยกเลิก</span>';
+          return `
+            <tr class="hover:bg-slate-50">
+              <td class="py-2.5 px-3">
+                <div class="font-bold text-indigo-600">${esc(b.id)}</div>
+                <div class="text-slate-500">${b.date}</div>
+              </td>
+              <td class="py-2.5 px-3">
+                <div class="font-semibold text-slate-900">${room ? room.name : b.roomId}</div>
+                <div class="text-slate-500">${sName} – ${eName}</div>
+              </td>
+              <td class="py-2.5 px-3">
+                <div class="font-semibold text-slate-800">${esc(b.teacher)}</div>
+                <div class="text-slate-500">${esc(b.department)}</div>
+              </td>
+              <td class="py-2.5 px-3">
+                <div class="font-semibold text-slate-800">${esc(b.title)}</div>
+                <div class="text-slate-500">${esc(b.classGroup)}</div>
+              </td>
+              <td class="py-2.5 px-3">${badge}</td>
+              <td class="py-2.5 px-3 text-right space-x-1 whitespace-nowrap">
+                <button type="button" data-edit-booking-id="${esc(b.id)}" class="btn-edit-booking px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold">แก้ไข</button>
+                <button type="button" data-delete-booking-id="${esc(b.id)}" class="btn-admin-delete-booking px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold">ลบ</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      // Render Admin Users CRUD Table
+      const usersTbody = document.getElementById('admin-users-tbody');
+      if (usersTbody) {
+        usersTbody.innerHTML = (state.data.users || []).map(u => `
+          <tr class="hover:bg-slate-50">
+            <td class="py-2.5 px-3 font-bold text-slate-900">${esc(u.username)}</td>
+            <td class="py-2.5 px-3 font-semibold text-slate-800">${esc(u.fullName)}</td>
+            <td class="py-2.5 px-3 text-slate-600">${esc(u.department)}</td>
+            <td class="py-2.5 px-3 font-mono text-slate-400">••••••</td>
+            <td class="py-2.5 px-3">
+              <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${u.role === 'admin' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-700'}">
+                ${u.role === 'admin' ? 'ผู้ดูแลระบบ (admin)' : 'ครู/บุคลากร (teacher)'}
+              </span>
+            </td>
+            <td class="py-2.5 px-3 text-right space-x-1 whitespace-nowrap">
+              <button type="button" data-edit-username="${esc(u.username)}" class="btn-edit-user px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold">แก้ไข</button>
+              <button type="button" data-delete-username="${esc(u.username)}" class="btn-delete-user px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold">ลบ</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    // --- POPULATE BOOKING MODAL OPTIONS (CREATE OR EDIT) ---
+    function openBookingModal(prefillRoomId = null, prefillPeriod = 1, editBookingId = null) {
+      if (!state.currentUser) {
+        showToast('กรุณาลงชื่อเข้าใช้งานก่อนทำการจองห้องเรียน', 'warning');
+        openAuthModal();
+        return;
+      }
+
+      const roomSelect = document.getElementById('book-room');
+      roomSelect.innerHTML = state.data.rooms.map(r => `
+        <option value="${esc(r.id)}">${esc(r.name)} (${r.capacity} ที่นั่ง)</option>
+      `).join('');
+
+      const startSelect = document.getElementById('book-start-period');
+      const endSelect = document.getElementById('book-end-period');
+      const periodOpts = SCHOOL_PERIODS.map(p => `<option value="${p.id}">${p.name} (${p.time})</option>`).join('');
+      startSelect.innerHTML = periodOpts;
+      endSelect.innerHTML = periodOpts;
+
+      const editIdInput = document.getElementById('book-edit-id');
+      const statusWrapper = document.getElementById('book-status-wrapper');
+      const statusSelect = document.getElementById('book-status-select');
+
+      if (editBookingId) {
+        const existing = state.data.bookings.find(b => b.id === editBookingId);
+        if (!existing) return;
+        editIdInput.value = existing.id;
+        roomSelect.value = existing.roomId;
+        document.getElementById('book-date').value = existing.date;
+        startSelect.value = String(existing.startPeriod);
+        endSelect.value = String(existing.endPeriod);
+        document.getElementById('book-teacher').value = existing.teacher;
+        document.getElementById('book-department').value = existing.department;
+        document.getElementById('book-title').value = existing.title;
+        document.getElementById('book-class').value = existing.classGroup;
+        document.getElementById('book-note').value = existing.note || '';
+        const eqSet = new Set(existing.equipment || []);
+        document.querySelectorAll('input[name="book-equip"]').forEach(chk => {
+          chk.checked = eqSet.has(chk.value);
+        });
+        statusWrapper.classList.remove('hidden');
+        statusSelect.value = existing.status;
+      } else {
+        editIdInput.value = '';
+        statusWrapper.classList.add('hidden');
+        document.getElementById('form-booking').reset();
+        if (prefillRoomId) {
+          roomSelect.value = prefillRoomId;
+        }
+        startSelect.value = String(prefillPeriod);
+        endSelect.value = String(Math.min(SCHOOL_PERIODS.length, prefillPeriod + 1));
+        document.getElementById('book-date').value = state.selectedDate;
+        if (state.currentUser) {
+          document.getElementById('book-teacher').value = state.currentUser.fullName;
+          const deptSelect = document.getElementById('book-department');
+          if (deptSelect) {
+            deptSelect.value = state.currentUser.department;
+          }
+        }
+      }
+
+      document.getElementById('booking-conflict-alert').classList.add('hidden');
+      const modal = document.getElementById('modal-booking');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function openRoomEditorModal(roomId = null) {
+      const form = document.getElementById('form-add-room');
+      form.reset();
+      const editInput = document.getElementById('edit-room-id');
+      if (roomId) {
+        const room = state.data.rooms.find(r => r.id === roomId);
+        if (!room) return;
+        editInput.value = room.id;
+        document.getElementById('new-room-name').value = room.name;
+        document.getElementById('new-room-building').value = room.building;
+        document.getElementById('new-room-capacity').value = room.capacity;
+        document.getElementById('new-room-category').value = room.category;
+        document.getElementById('new-room-equip').value = (room.equipment || []).join(', ');
+        document.getElementById('new-room-require-approval').checked = !!room.requireApproval;
+        document.getElementById('new-room-status').value = room.status || 'ACTIVE';
+      } else {
+        editInput.value = '';
+        document.getElementById('new-room-status').value = 'ACTIVE';
+      }
+      const modal = document.getElementById('modal-add-room');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function openUserEditorModal(username = null) {
+      const form = document.getElementById('form-edit-user');
+      form.reset();
+      const origInput = document.getElementById('edit-user-original-username');
+      const titleEl = document.getElementById('modal-user-title');
+      if (username) {
+        const user = (state.data.users || []).find(u => u.username === username);
+        if (!user) return;
+        titleEl.textContent = `แก้ไขข้อมูลบุคลากร (${user.username})`;
+        origInput.value = user.username;
+        document.getElementById('edit-user-fullname').value = user.fullName;
+        document.getElementById('edit-user-username').value = user.username;
+        document.getElementById('edit-user-password').value = '';
+        document.getElementById('edit-user-department').value = user.department;
+        document.getElementById('edit-user-role').value = user.role || 'teacher';
+      } else {
+        titleEl.textContent = 'เพิ่มบุคลากร / ผู้ใช้งานใหม่';
+        origInput.value = '';
+      }
+      const modal = document.getElementById('modal-edit-user');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeUserEditorModal() {
+      const modal = document.getElementById('modal-edit-user');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function closeBookingModal() {
+      const modal = document.getElementById('modal-booking');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    // --- OPEN BOOKING DETAIL SLIP ---
+    function openBookingDetail(bookingId) {
+      const booking = state.data.bookings.find(b => b.id === bookingId);
+      if (!booking) return;
+      state.activeDetailBookingId = bookingId;
+
+      const room = state.data.rooms.find(r => r.id === booking.roomId);
+      const startP = SCHOOL_PERIODS.find(p => p.id === booking.startPeriod);
+      const endP = SCHOOL_PERIODS.find(p => p.id === booking.endPeriod);
+
+      document.getElementById('detail-id-badge').textContent = booking.id;
+      document.getElementById('detail-title').textContent = booking.title;
+
+      const statusText = booking.status === 'APPROVED' ? 'อนุมัติแล้ว (พร้อมใช้งาน)' : booking.status === 'PENDING' ? 'รอการอนุมัติจากผู้ดูแล' : 'ยกเลิก / ไม่อนุมัติ';
+      const statusClass = booking.status === 'APPROVED' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : booking.status === 'PENDING' ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-rose-700 bg-rose-50 border-rose-200';
+
+      document.getElementById('detail-body-content').innerHTML = `
+        <div class="p-3 rounded-xl border ${statusClass} font-bold text-center">
+          สถานะ: ${statusText}
+        </div>
+        <div class="space-y-2 pt-1">
+          <div class="flex justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-500">ห้องที่ใช้งาน:</span>
+            <span class="font-bold text-slate-900 text-right">${room ? room.name : booking.roomId}</span>
+          </div>
+          <div class="flex justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-500">อาคาร / สถานที่:</span>
+            <span class="font-semibold text-slate-800">${room ? room.building : '-'}</span>
+          </div>
+          <div class="flex justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-500">วันที่ใช้งาน:</span>
+            <span class="font-semibold text-slate-800">${formatThaiDate(booking.date)}</span>
+          </div>
+          <div class="flex justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-500">ช่วงคาบเรียน:</span>
+            <span class="font-bold text-indigo-600">${startP ? startP.name : ''} – ${endP ? endP.name : ''} (${startP ? startP.time.split(' - ')[0] : ''} - ${endP ? endP.time.split(' - ')[1] : ''})</span>
+          </div>
+          <div class="flex justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-500">ครูผู้ขอใช้ห้อง:</span>
+            <span class="font-semibold text-slate-800">${booking.teacher}</span>
+          </div>
+          <div class="flex justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-500">กลุ่มสาระฯ / ฝ่าย:</span>
+            <span class="font-semibold text-slate-800">${booking.department}</span>
+          </div>
+          <div class="flex justify-between py-1.5 border-b border-slate-100">
+            <span class="text-slate-500">ชั้นเรียน / จำนวน:</span>
+            <span class="font-semibold text-slate-800">${booking.classGroup}</span>
+          </div>
+          <div class="py-1.5 border-b border-slate-100">
+            <span class="text-slate-500 block mb-1">อุปกรณ์ที่ขอใช้:</span>
+            <div class="flex flex-wrap gap-1">
+              ${(booking.equipment && booking.equipment.length) ? booking.equipment.map(e => `<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700">${e}</span>`).join('') : '<span class="text-slate-400">ไม่ได้ระบุเพิ่มเติม</span>'}
+            </div>
+          </div>
+          ${booking.note ? `
+          <div class="py-1.5">
+            <span class="text-slate-500 block mb-0.5">หมายเหตุ:</span>
+            <p class="text-slate-800 bg-slate-50 p-2 rounded-lg">${booking.note}</p>
+          </div>` : ''}
+        </div>
+      `;
+
+      const adminActions = document.getElementById('detail-admin-actions');
+      const isOwner = state.currentUser && state.currentUser.fullName === booking.teacher;
+      const canManageBooking = state.role === 'admin' || isOwner;
+
+      const editBtn = document.getElementById('btn-edit-booking-from-detail');
+      const delBtn = document.getElementById('btn-delete-booking');
+      if (editBtn) editBtn.classList.toggle('hidden', !canManageBooking);
+      if (delBtn) delBtn.classList.toggle('hidden', !canManageBooking);
+
+      if (state.role === 'admin' && booking.status === 'PENDING') {
+        adminActions.innerHTML = `
+          <button type="button" data-approve-id="${booking.id}" class="btn-approve-single px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold">อนุมัติทันที</button>
+        `;
+      } else {
+        adminActions.innerHTML = '';
+      }
+
+      const modal = document.getElementById('modal-detail');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeDetailModal() {
+      const modal = document.getElementById('modal-detail');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    // --- AUTHENTICATION UI & HELPERS ---
+    function renderUserSessionBar() {
+      // Strictly sync state.role from the currently logged-in account
+      state.role = state.currentUser ? (state.currentUser.role || 'teacher') : 'guest';
+
+      const nameEl = document.getElementById('user-display-name');
+      const deptEl = document.getElementById('user-display-dept');
+      const avatarEl = document.getElementById('user-avatar-initials');
+      const switchBtn = document.getElementById('btn-open-auth-modal');
+      const logoutBtn = document.getElementById('btn-logout');
+      const roleSelect = document.getElementById('role-select');
+      const rolePill = document.getElementById('account-role-pill');
+      const roleText = document.getElementById('account-role-text');
+      const addRoomBtn = document.getElementById('btn-open-add-room');
+
+      if (state.currentUser) {
+        const isAdmin = state.currentUser.role === 'admin';
+        nameEl.textContent = state.currentUser.fullName;
+        deptEl.textContent = state.currentUser.department;
+        const cleanName = state.currentUser.fullName.replace(/^อ\.|^ครู|^ดร\./g, '').trim();
+        avatarEl.textContent = cleanName.slice(0, 2) || 'ครู';
+        avatarEl.className = isAdmin
+          ? 'w-7 h-7 rounded-lg bg-amber-600 text-white text-xs font-bold flex items-center justify-center shrink-0'
+          : 'w-7 h-7 rounded-lg bg-indigo-600 text-white text-xs font-bold flex items-center justify-center shrink-0';
+        switchBtn.textContent = 'สลับบัญชี';
+        logoutBtn.classList.remove('hidden');
+        if (roleSelect) roleSelect.value = state.role;
+
+        if (rolePill && roleText) {
+          roleText.textContent = isAdmin ? 'มุมมอง: ผู้ดูแลระบบ' : 'มุมมอง: ครู / บุคลากร';
+          rolePill.className = isAdmin
+            ? 'flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl px-3 py-1.5'
+            : 'flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-xl px-3 py-1.5';
+        }
+        if (addRoomBtn) {
+          addRoomBtn.classList.toggle('hidden', !isAdmin);
+        }
+      } else {
+        nameEl.textContent = 'ยังไม่ได้เข้าสู่ระบบ';
+        deptEl.textContent = 'กรุณาเข้าสู่ระบบเพื่อจองห้อง';
+        avatarEl.textContent = '?';
+        avatarEl.className = 'w-7 h-7 rounded-lg bg-slate-400 text-white text-xs font-bold flex items-center justify-center shrink-0';
+        switchBtn.textContent = 'เข้าสู่ระบบ';
+        logoutBtn.classList.add('hidden');
+        if (rolePill && roleText) {
+          roleText.textContent = 'มุมมอง: ผู้เยี่ยมชม';
+          rolePill.className = 'flex items-center gap-1.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5';
+        }
+        if (addRoomBtn) {
+          addRoomBtn.classList.add('hidden');
+        }
+      }
+    }
+
+    function openAuthModal(mode = 'login') {
+      const modal = document.getElementById('modal-auth');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      switchAuthModalTab(mode);
+    }
+
+    function closeAuthModal() {
+      const modal = document.getElementById('modal-auth');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function switchAuthModalTab(mode) {
+      const loginForm = document.getElementById('form-login');
+      const regForm = document.getElementById('form-register');
+      const forgotForm = document.getElementById('form-forgot-password');
+      const tabLogin = document.getElementById('tab-auth-login');
+      const tabReg = document.getElementById('tab-auth-register');
+      const tabForgot = document.getElementById('tab-auth-forgot');
+
+      document.getElementById('login-error-alert').classList.add('hidden');
+      document.getElementById('register-error-alert').classList.add('hidden');
+      document.getElementById('forgot-error-alert').classList.add('hidden');
+      document.getElementById('forgot-success-alert').classList.add('hidden');
+
+      const activeClass = 'py-2 rounded-lg bg-white text-indigo-600 shadow-2xs transition';
+      const inactiveClass = 'py-2 rounded-lg text-slate-600 hover:text-slate-900 transition';
+
+      loginForm.classList.toggle('hidden', mode !== 'login');
+      regForm.classList.toggle('hidden', mode !== 'register');
+      forgotForm.classList.toggle('hidden', mode !== 'forgot');
+
+      tabLogin.className = mode === 'login' ? activeClass : inactiveClass;
+      tabReg.className = mode === 'register' ? activeClass : inactiveClass;
+      tabForgot.className = mode === 'forgot' ? activeClass : inactiveClass;
+    }
+
+    function loginWithUserObject(userObj) {
+      state.currentUser = {
+        username: userObj.username,
+        fullName: userObj.fullName,
+        department: userObj.department,
+        role: userObj.role || 'teacher'
+      };
+      state.role = state.currentUser.role;
+      saveUserSession();
+      closeAuthModal();
+      renderAll();
+      showToast(`ยินดีต้อนรับ ${state.currentUser.fullName} เข้าสู่ระบบ`);
+    }
+
+    // --- MAIN RENDER DISPATCHER ---
+    function renderAll() {
+      renderUserSessionBar();
+      renderSummaryStats();
+      renderScheduleMatrix();
+      renderRoomsGrid();
+      renderBookingsTable();
+      renderAdminPanel();
+      renderDatabasePanel();
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+    }
+
+    // --- RENDER DATABASE PANEL (ADMIN ONLY) ---
+    function renderDatabasePanel() {
+      const dbTabBtn = document.getElementById('nav-tab-database');
+      const adminTabBtn = document.getElementById('nav-tab-admin');
+      const dbView = document.getElementById('view-database');
+      const adminView = document.getElementById('view-admin');
+      const isAdmin = state.role === 'admin';
+
+      if (dbTabBtn) dbTabBtn.classList.toggle('hidden', !isAdmin);
+      if (adminTabBtn) adminTabBtn.classList.toggle('hidden', !isAdmin);
+
+      if (!isAdmin && (state.currentTab === 'database' || state.currentTab === 'admin')) {
+        state.currentTab = 'schedule';
+        if (dbView) dbView.classList.add('hidden');
+        if (adminView) adminView.classList.add('hidden');
+        const schedView = document.getElementById('view-schedule');
+        if (schedView) schedView.classList.remove('hidden');
+        document.querySelectorAll('.nav-tab').forEach(btn => {
+          const tab = btn.getAttribute('data-tab');
+          const hideBtn = (tab === 'database' || tab === 'admin') && !isAdmin;
+          const isCurrent = tab === 'schedule';
+          btn.className = isCurrent
+            ? `nav-tab ${hideBtn ? 'hidden ' : ''}px-3.5 py-1.5 rounded-lg text-sm font-semibold transition flex items-center gap-1.5 bg-white text-indigo-600 shadow-sm`
+            : `nav-tab ${hideBtn ? 'hidden ' : ''}px-3.5 py-1.5 rounded-lg text-sm font-semibold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900`;
+        });
+      }
+
+      const rEl = document.getElementById('db-count-rooms');
+      const bEl = document.getElementById('db-count-bookings');
+      const uEl = document.getElementById('db-count-users');
+      const urlInput = document.getElementById('gsheet-webapp-url');
+      if (rEl) rEl.textContent = `${(state.data.rooms || []).length} แถว`;
+      if (bEl) bEl.textContent = `${(state.data.bookings || []).length} แถว`;
+      if (uEl) uEl.textContent = `${(state.data.users || []).length} แถว`;
+      if (urlInput && state.data.gsheetWebAppUrl) {
+        urlInput.value = state.data.gsheetWebAppUrl;
+      }
+    }
+
+    // --- TAB SWITCHING ---
+    function switchTab(tabName) {
+      if ((tabName === 'database' || tabName === 'admin') && state.role !== 'admin') {
+        showToast('เมนูนี้สงวนสิทธิ์เฉพาะบัญชีผู้ดูแลระบบ (Admin) เท่านั้น', 'warning');
+        return;
+      }
+      state.currentTab = tabName;
+      const views = ['schedule', 'rooms', 'mybookings', 'admin', 'database'];
+      views.forEach(v => {
+        const el = document.getElementById(`view-${v}`);
+        if (el) {
+          el.classList.toggle('hidden', v !== tabName);
+        }
+      });
+
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        const t = btn.getAttribute('data-tab');
+        const hideAdminTab = (t === 'database' || t === 'admin') && state.role !== 'admin';
+        const isCurrent = t === tabName;
+        if (isCurrent) {
+          btn.className = `nav-tab ${hideAdminTab ? 'hidden ' : ''}px-3.5 py-1.5 rounded-lg text-sm font-semibold transition flex items-center gap-1.5 bg-white text-indigo-600 shadow-sm`;
+        } else {
+          btn.className = `nav-tab ${hideAdminTab ? 'hidden ' : ''}px-3.5 py-1.5 rounded-lg text-sm font-semibold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900`;
+        }
+      });
+
+      renderAll();
+    }
+
+    // --- EXPORT CSV ---
+    function exportBookingsCSV() {
+      const headers = ['รหัสการจอง', 'วันที่', 'ห้อง', 'คาบเริ่มต้น', 'คาบสิ้นสุด', 'ครูผู้จอง', 'กลุ่มสาระ', 'วิชา/กิจกรรม', 'ชั้นเรียน', 'สถานะ'];
+      const rows = state.data.bookings.map(b => {
+        const room = state.data.rooms.find(r => r.id === b.roomId);
+        return [
+          b.id,
+          b.date,
+          room ? room.name : b.roomId,
+          b.startPeriod,
+          b.endPeriod,
+          b.teacher,
+          b.department,
+          b.title,
+          b.classGroup,
+          b.status
+        ].map(val => `"${String(val || '').replace(/"/g, '""')}"`).join(',');
+      });
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `school_room_bookings_${state.selectedDate}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast('ส่งออกไฟล์รายงาน CSV เรียบร้อยแล้ว');
+    }
+
+    // --- INITIALIZE & ATTACH LISTENERS ---
+    function sicecInit() {
+      if (window.__sicecStarted) return;
+      window.__sicecStarted = true;
+      loadState();
+      renderAll();
+
+      initSupabase();
+
+      // Nav tabs
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          switchTab(btn.getAttribute('data-tab'));
+        });
+      });
+
+      // Auth modal controls
+      document.getElementById('btn-open-auth-modal').addEventListener('click', () => openAuthModal('login'));
+      document.getElementById('btn-close-auth-modal').addEventListener('click', closeAuthModal);
+      document.getElementById('tab-auth-login').addEventListener('click', () => switchAuthModalTab('login'));
+      document.getElementById('tab-auth-register').addEventListener('click', () => switchAuthModalTab('register'));
+      document.getElementById('tab-auth-forgot').addEventListener('click', () => switchAuthModalTab('forgot'));
+      document.getElementById('btn-goto-forgot-pw').addEventListener('click', () => switchAuthModalTab('forgot'));
+      document.getElementById('btn-back-to-login').addEventListener('click', () => switchAuthModalTab('login'));
+
+      // Forgot Password form submit
+      document.getElementById('form-forgot-password').addEventListener('submit', (e) => {
+        e.preventDefault();
+        showToast('กรุณาติดต่อผู้ดูแลระบบเพื่อรีเซ็ตรหัสผ่าน','warning');
+        return;
+        const uname = document.getElementById('forgot-username').value.trim().toLowerCase();
+        const dept = document.getElementById('forgot-department').value;
+        const newPw = document.getElementById('forgot-new-password').value;
+        const confirmPw = document.getElementById('forgot-confirm-password').value;
+        const errBox = document.getElementById('forgot-error-alert');
+        const okBox = document.getElementById('forgot-success-alert');
+
+        errBox.classList.add('hidden');
+        okBox.classList.add('hidden');
+
+        if (newPw !== confirmPw) {
+          errBox.textContent = 'รหัสผ่านใหม่และการยืนยันรหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง';
+          errBox.classList.remove('hidden');
+          return;
+        }
+
+        const user = (state.data.users || []).find(
+          u => u.username.toLowerCase() === uname && u.department === dept
+        );
+
+        if (!user) {
+          errBox.textContent = 'ไม่พบชื่อผู้ใช้ที่ตรงกับแผนกวิชาที่เลือก กรุณาตรวจสอบข้อมูลหรือติดต่อผู้ดูแลระบบ';
+          errBox.classList.remove('hidden');
+          return;
+        }
+
+        user.password = newPw;
+        saveState();
+        document.getElementById('form-forgot-password').reset();
+        okBox.textContent = `ตั้งรหัสผ่านใหม่สำหรับบัญชี "${user.username}" (${user.fullName}) สำเร็จแล้ว สามารถเข้าสู่ระบบได้ทันที`;
+        okBox.classList.remove('hidden');
+        showToast(`รีเซ็ตรหัสผ่านของ ${user.fullName} เรียบร้อยแล้ว`);
+      });
+
+      // Download Ready-to-Use HTML file button
+      document.getElementById('btn-download-ready-html').addEventListener('click', () => {
+        const fullHtml = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'ระบบจองห้องเรียน_วิทยาลัยการอาชีพสระบุรี.html';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast('ดาวน์โหลดไฟล์ ระบบจองห้องเรียน_วิทยาลัยการอาชีพสระบุรี.html เรียบร้อยแล้ว');
+      });
+
+      document.getElementById('btn-logout').addEventListener('click', () => {
+        sb.auth.signOut(); state.data.users = [];
+        state.currentUser = null;
+        state.role = 'teacher';
+        saveUserSession();
+        renderAll();
+        showToast('ออกจากระบบเรียบร้อยแล้ว', 'warning');
+        openAuthModal('login');
+      });
+
+      // Login form submit
+      document.getElementById('form-login').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const u = document.getElementById('login-username').value.trim();
+        const p = document.getElementById('login-password').value;
+        const errBox = document.getElementById('login-error-alert');
+        const { data, error } = await sb.auth.signInWithPassword({ email: toEmail(u), password: p });
+        if (error || !(await restoreProfile(data.user.id))) {
+          errBox.textContent = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
+          errBox.classList.remove('hidden');
+          return;
+        }
+        errBox.classList.add('hidden');
+        document.getElementById('form-login').reset();
+        await loadRemote();
+        loginWithUserObject(state.currentUser);
+      });
+
+      // Register form submit (สิทธิ์ถูกกำหนดเป็น teacher เสมอโดยฐานข้อมูล)
+      document.getElementById('form-register').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fullName = document.getElementById('reg-fullname').value.trim();
+        const username = document.getElementById('reg-username').value.trim().toLowerCase();
+        const password = document.getElementById('reg-password').value;
+        const department = document.getElementById('reg-department').value;
+        const errBox = document.getElementById('register-error-alert');
+        const fail = (m) => { errBox.textContent = m; errBox.classList.remove('hidden'); };
+        if (!/^[a-z0-9._-]{3,30}$/.test(username)) return fail('ชื่อผู้ใช้ใช้ได้เฉพาะ a-z 0-9 . _ - (3-30 ตัว)');
+        if (password.length < 8) return fail('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
+        const { data, error } = await sb.auth.signUp({ email: toEmail(username), password,
+          options: { data: { username, full_name: fullName, department } } });
+        if (error) return fail(/registered|exists/i.test(error.message) ? 'ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว' : error.message);
+        if (!data.session) return fail('สมัครแล้วแต่เข้าระบบไม่ได้: ผู้ดูแลต้องปิด Confirm email ใน Supabase');
+        errBox.classList.add('hidden');
+        document.getElementById('form-register').reset();
+        await restoreProfile(data.user.id);
+        await loadRemote();
+        loginWithUserObject(state.currentUser);
+      });
+
+            // Role selector
+      document.getElementById('role-select').addEventListener('change', (e) => {
+        state.role = e.target.value;
+        if (state.role === 'admin') {
+          showToast('สลับเป็นมุมมองผู้ดูแลระบบ (สามารถอนุมัติและจัดการห้องได้)');
+        } else {
+          showToast('สลับเป็นมุมมองครู / บุคลากร');
+        }
+        renderAll();
+      });
+
+      // Date navigation
+      document.getElementById('schedule-date-picker').addEventListener('change', (e) => {
+        if (e.target.value) {
+          state.selectedDate = e.target.value;
+          renderAll();
+        }
+      });
+      document.getElementById('btn-prev-day').addEventListener('click', () => {
+        state.selectedDate = addDaysISO(state.selectedDate, -1);
+        renderAll();
+      });
+      document.getElementById('btn-next-day').addEventListener('click', () => {
+        state.selectedDate = addDaysISO(state.selectedDate, 1);
+        renderAll();
+      });
+      document.getElementById('btn-today').addEventListener('click', () => {
+        state.selectedDate = getTodayISO();
+        renderAll();
+      });
+
+      // Schedule category filter
+      document.getElementById('schedule-category-filter').addEventListener('change', (e) => {
+        state.scheduleCategory = e.target.value;
+        renderScheduleMatrix();
+      });
+
+      // Room search & filter
+      document.getElementById('room-search-input').addEventListener('input', (e) => {
+        state.roomSearch = e.target.value;
+        renderRoomsGrid();
+      });
+      document.getElementById('room-capacity-filter').addEventListener('change', (e) => {
+        state.roomMinCapacity = Number(e.target.value);
+        renderRoomsGrid();
+      });
+
+      // Booking search & filter
+      document.getElementById('booking-search-input').addEventListener('input', (e) => {
+        state.bookingSearch = e.target.value;
+        renderBookingsTable();
+      });
+      document.getElementById('booking-status-filter').addEventListener('change', (e) => {
+        state.bookingStatusFilter = e.target.value;
+        renderBookingsTable();
+      });
+
+      // Export CSV
+      document.getElementById('btn-export-csv').addEventListener('click', exportBookingsCSV);
+
+      // Google Sheets Database Panel Listeners
+      document.getElementById('btn-save-gsheet-url').addEventListener('click', () => {
+        const val = document.getElementById('gsheet-webapp-url').value.trim();
+        state.data.gsheetWebAppUrl = val;
+        saveState();
+        showToast(val ? 'บันทึก Google Apps Script URL เรียบร้อยแล้ว' : 'ล้างค่า URL แล้ว');
+      });
+
+      document.getElementById('btn-copy-full-html').addEventListener('click', () => {
+        const fullHtml = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        const ta = document.createElement('textarea');
+        ta.value = fullHtml;
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          showToast('คัดลอกโค้ด HTML ทั้งหน้าแล้ว นำไปวางในไฟล์ Index.html บน Apps Script ได้เลย');
+        } catch (err) {
+          showToast('ไม่สามารถคัดลอกอัตโนมัติได้', 'warning');
+        }
+        ta.remove();
+      });
+
+      document.getElementById('btn-copy-apps-script').addEventListener('click', () => {
+        const codeText = document.getElementById('apps-script-code').innerText;
+        const ta = document.createElement('textarea');
+        ta.value = codeText;
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          showToast('คัดลอกโค้ด Google Apps Script เรียบร้อยแล้ว');
+        } catch (err) {
+          showToast('กรุณาคลุมดำเพื่อคัดลอกโค้ด', 'warning');
+        }
+        ta.remove();
+      });
+
+      document.getElementById('btn-sync-push-gsheet').addEventListener('click', async () => {
+        const url = (document.getElementById('gsheet-webapp-url').value || state.data.gsheetWebAppUrl || '').trim();
+        if (!url) {
+          showToast('กรุณาวาง Google Apps Script Web App URL ก่อนกดส่งข้อมูล', 'warning');
+          return;
+        }
+        state.data.gsheetWebAppUrl = url;
+        saveState();
+        const badge = document.getElementById('gsheet-sync-badge');
+        badge.textContent = 'กำลังส่งข้อมูล...';
+        try {
+          await fetch(url, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              rooms: state.data.rooms,
+              bookings: state.data.bookings,
+              users: state.data.users
+            })
+          });
+          badge.textContent = 'ซิงค์ล่าสุดเมื่อสักครู่';
+          showToast('ส่งข้อมูล Rooms, Bookings และ Users ไปยัง Google Sheets เรียบร้อยแล้ว');
+        } catch (err) {
+          badge.textContent = 'เกิดข้อผิดพลาดในการเชื่อมต่อ';
+          showToast('ไม่สามารถเชื่อมต่อ Web App URL ได้ กรุณาตรวจสอบสิทธิ์การ Deploy (Anyone)', 'error');
+        }
+      });
+
+      document.getElementById('btn-sync-pull-gsheet').addEventListener('click', async () => {
+        const url = (document.getElementById('gsheet-webapp-url').value || state.data.gsheetWebAppUrl || '').trim();
+        if (!url) {
+          showToast('กรุณาวาง Google Apps Script Web App URL ก่อนกดดึงข้อมูล', 'warning');
+          return;
+        }
+        state.data.gsheetWebAppUrl = url;
+        saveState();
+        const badge = document.getElementById('gsheet-sync-badge');
+        badge.textContent = 'กำลังดึงข้อมูล...';
+        try {
+          const fetchUrl = url.includes('?') ? `${url}&mode=api` : `${url}?mode=api`;
+          const res = await fetch(fetchUrl);
+          const json = await res.json();
+          if (json && Array.isArray(json.rooms) && json.rooms.length) {
+            state.data.rooms = json.rooms.map(r => ({
+              ...r,
+              capacity: Number(r.capacity) || 40,
+              requireApproval: r.requireApproval === true || String(r.requireApproval).toUpperCase() === 'TRUE',
+              equipment: Array.isArray(r.equipment) ? r.equipment : String(r.equipment || '').split(',').map(s => s.trim()).filter(Boolean)
+            }));
+          }
+          if (json && Array.isArray(json.bookings)) {
+            state.data.bookings = json.bookings.map(b => ({
+              ...b,
+              startPeriod: Number(b.startPeriod) || 1,
+              endPeriod: Number(b.endPeriod) || 1,
+              equipment: Array.isArray(b.equipment) ? b.equipment : String(b.equipment || '').split(',').map(s => s.trim()).filter(Boolean)
+            }));
+          }
+          if (json && Array.isArray(json.users) && json.users.length) {
+            state.data.users = json.users;
+          }
+          saveState();
+          renderAll();
+          badge.textContent = 'ดึงข้อมูลสำเร็จ';
+          showToast('ดึงข้อมูลล่าสุดจาก Google Sheets เรียบร้อยแล้ว');
+        } catch (err) {
+          badge.textContent = 'เกิดข้อผิดพลาดในการดึงข้อมูล';
+          showToast('ไม่สามารถดึงข้อมูลจาก Web App URL ได้ กรุณาตรวจสอบ URL', 'error');
+        }
+      });
+
+      document.getElementById('btn-export-rooms-csv').addEventListener('click', () => {
+        const headers = ['roomId','name','building','capacity','category','equipment','requireApproval','status'];
+        const rows = state.data.rooms.map(r => [
+          r.id, r.name, r.building, r.capacity, r.category, (r.equipment || []).join(', '), r.requireApproval, r.status
+        ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','));
+        const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Rooms_Sheet.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast('ส่งออกไฟล์ Rooms_Sheet.csv เรียบร้อย');
+      });
+
+      document.getElementById('btn-export-users-csv').addEventListener('click', () => {
+        const headers = ['username','password','fullName','department','role'];
+        const rows = (state.data.users || []).map(u => [
+          u.username, '', u.fullName, u.department, u.role
+        ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','));
+        const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Users_Sheet.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast('ส่งออกไฟล์ Users_Sheet.csv เรียบร้อย');
+      });
+
+      // Open/close booking modal
+      document.getElementById('btn-open-booking-modal').addEventListener('click', () => openBookingModal());
+      document.getElementById('btn-close-booking-modal').addEventListener('click', closeBookingModal);
+      document.getElementById('btn-cancel-booking-modal').addEventListener('click', closeBookingModal);
+
+      // Submit booking form
+      document.getElementById('form-booking').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const roomId = document.getElementById('book-room').value;
+        const date = document.getElementById('book-date').value;
+        const startPeriod = Number(document.getElementById('book-start-period').value);
+        const endPeriod = Number(document.getElementById('book-end-period').value);
+        const teacher = document.getElementById('book-teacher').value.trim();
+        const department = document.getElementById('book-department').value;
+        const title = document.getElementById('book-title').value.trim();
+        const classGroup = document.getElementById('book-class').value.trim();
+        const note = document.getElementById('book-note').value.trim();
+
+        const alertBox = document.getElementById('booking-conflict-alert');
+
+        if (endPeriod < startPeriod) {
+          alertBox.textContent = 'คาบเรียนสิ้นสุดต้องไม่น้อยกว่าคาบเรียนเริ่มต้น';
+          alertBox.classList.remove('hidden');
+          return;
+        }
+
+        const editId = document.getElementById('book-edit-id').value.trim();
+        const conflict = findConflictingBooking(roomId, date, startPeriod, endPeriod, editId || null);
+        if (conflict) {
+          alertBox.textContent = `ไม่สามารถบันทึกได้ เนื่องจากชนกับรายการ "${esc(conflict.title)}" (${esc(conflict.teacher)}) ในช่วงคาบเรียนดังกล่าว`;
+          alertBox.classList.remove('hidden');
+          return;
+        }
+
+        const equipChecked = Array.from(document.querySelectorAll('input[name="book-equip"]:checked')).map(el => el.value);
+        const roomObj = state.data.rooms.find(r => r.id === roomId);
+        const needsApproval = (roomObj && roomObj.requireApproval) || !state.data.autoApproveGeneral;
+
+        if (editId) {
+          const target = state.data.bookings.find(b => b.id === editId);
+          if (target) {
+            target.roomId = roomId;
+            target.date = date;
+            target.startPeriod = startPeriod;
+            target.endPeriod = endPeriod;
+            target.teacher = teacher;
+            target.department = department;
+            target.title = title;
+            target.classGroup = classGroup;
+            target.equipment = equipChecked;
+            target.note = note;
+            target.status = document.getElementById('book-status-select').value || target.status;
+          }
+          state.selectedDate = date;
+          saveState();
+          closeBookingModal();
+          document.getElementById('form-booking').reset();
+          renderAll();
+          showToast(`บันทึกการแก้ไขรายการจอง ${editId} เรียบร้อยแล้ว`);
+          return;
+        }
+
+        const newId = 'BK-' + Date.now().toString(36).toUpperCase() + Math.floor(Math.random() * 1296).toString(36).toUpperCase();
+        const newBooking = {
+          id: newId,
+          roomId,
+          date,
+          startPeriod,
+          endPeriod,
+          teacher,
+          department,
+          title,
+          classGroup,
+          equipment: equipChecked,
+          note,
+          status: state.role === 'admin' ? 'APPROVED' : (needsApproval ? 'PENDING' : 'APPROVED'),
+          createdAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+        };
+
+        state.data.bookings.unshift(newBooking);
+        state.selectedDate = date;
+        saveState();
+        closeBookingModal();
+        document.getElementById('form-booking').reset();
+        renderAll();
+
+        if (newBooking.status === 'PENDING') {
+          showToast(`ส่งคำขอจอง ${newId} แล้ว (รอฝ่ายอาคารสถานที่อนุมัติ)`, 'warning');
+        } else {
+          showToast(`จองห้องสำเร็จ (${newId}) อนุมัติพร้อมใช้งานทันที`);
+        }
+      });
+
+      // Close detail modal
+      document.getElementById('btn-close-detail-modal').addEventListener('click', closeDetailModal);
+
+      // Print slip
+      document.getElementById('btn-print-slip').addEventListener('click', () => {
+        window.print();
+      });
+
+      // Cancel/delete booking inside detail modal
+      document.getElementById('btn-delete-booking').addEventListener('click', () => {
+        if (!state.activeDetailBookingId) return;
+        const idx = state.data.bookings.findIndex(b => b.id === state.activeDetailBookingId);
+        if (idx !== -1) {
+          const removed = state.data.bookings.splice(idx, 1)[0];
+          saveState();
+          closeDetailModal();
+          renderAll();
+          showToast(`ยกเลิกรายการจอง ${removed.id} เรียบร้อยแล้ว`);
+        }
+      });
+
+      // Add Room Modal
+      const addRoomModal = document.getElementById('modal-add-room');
+      const closeAddRoom = () => {
+        addRoomModal.classList.add('hidden');
+        addRoomModal.classList.remove('flex');
+      };
+      document.getElementById('btn-open-add-room').addEventListener('click', () => openRoomEditorModal(null));
+      document.getElementById('btn-admin-add-room').addEventListener('click', () => openRoomEditorModal(null));
+      document.getElementById('btn-admin-add-booking').addEventListener('click', () => openBookingModal(null, 1, null));
+      document.getElementById('btn-admin-add-user').addEventListener('click', () => openUserEditorModal(null));
+      document.getElementById('btn-close-add-room').addEventListener('click', closeAddRoom);
+      document.getElementById('btn-cancel-add-room').addEventListener('click', closeAddRoom);
+
+      document.getElementById('btn-close-edit-user').addEventListener('click', closeUserEditorModal);
+      document.getElementById('btn-cancel-edit-user').addEventListener('click', closeUserEditorModal);
+
+      // Edit booking from detail modal
+      document.getElementById('btn-edit-booking-from-detail').addEventListener('click', () => {
+        if (!state.activeDetailBookingId) return;
+        const bId = state.activeDetailBookingId;
+        closeDetailModal();
+        openBookingModal(null, 1, bId);
+      });
+
+      // Admin Sub-tab switcher
+      document.querySelectorAll('.admin-subtab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.getAttribute('data-admin-subtab');
+          ['rooms', 'bookings', 'users'].forEach(sub => {
+            document.getElementById(`admin-subview-${sub}`).classList.toggle('hidden', sub !== target);
+          });
+          document.querySelectorAll('.admin-subtab-btn').forEach(b => {
+            if (b.getAttribute('data-admin-subtab') === target) {
+              b.className = 'admin-subtab-btn px-3 py-1.5 rounded-lg bg-white text-indigo-600 shadow-2xs transition';
+            } else {
+              b.className = 'admin-subtab-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition';
+            }
+          });
+        });
+      });
+
+      document.getElementById('form-add-room').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const editId = document.getElementById('edit-room-id').value.trim();
+        const name = document.getElementById('new-room-name').value.trim();
+        const building = document.getElementById('new-room-building').value.trim();
+        const capacity = Number(document.getElementById('new-room-capacity').value) || 40;
+        const category = document.getElementById('new-room-category').value;
+        const equipRaw = document.getElementById('new-room-equip').value;
+        const requireApproval = document.getElementById('new-room-require-approval').checked;
+        const status = document.getElementById('new-room-status').value || 'ACTIVE';
+        const equipment = equipRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+        if (editId) {
+          const room = state.data.rooms.find(r => r.id === editId);
+          if (room) {
+            room.name = name;
+            room.building = building;
+            room.capacity = capacity;
+            room.category = category;
+            room.equipment = equipment.length ? equipment : ['โปรเจคเตอร์', 'เครื่องปรับอากาศ'];
+            room.requireApproval = requireApproval;
+            room.status = status;
+          }
+          saveState();
+          closeAddRoom();
+          document.getElementById('form-add-room').reset();
+          renderAll();
+          showToast(`บันทึกการแก้ไขข้อมูลห้อง "${name}" เรียบร้อยแล้ว`);
+          return;
+        }
+
+        const newRoom = {
+          id: 'RM-' + (100 + state.data.rooms.length + 1),
+          name,
+          building,
+          capacity,
+          category,
+          equipment: equipment.length ? equipment : ['โปรเจคเตอร์', 'เครื่องปรับอากาศ'],
+          requireApproval,
+          status
+        };
+
+        state.data.rooms.push(newRoom);
+        saveState();
+        closeAddRoom();
+        document.getElementById('form-add-room').reset();
+        renderAll();
+        showToast(`เพิ่มห้อง "${name}" เข้าสู่ระบบเรียบร้อยแล้ว`);
+      });
+
+      document.getElementById('form-edit-user').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const origUser = document.getElementById('edit-user-original-username').value.trim();
+        const fullName = document.getElementById('edit-user-fullname').value.trim();
+        const username = document.getElementById('edit-user-username').value.trim();
+        const password = document.getElementById('edit-user-password').value;
+        const department = document.getElementById('edit-user-department').value;
+        const role = document.getElementById('edit-user-role').value;
+
+        if (!state.data.users) state.data.users = [];
+        if (origUser) {
+          const target = state.data.users.find(u => u.username === origUser);
+          if (target) {
+            target.username = username;
+            target.fullName = fullName;
+            target.password = password;
+            target.department = department;
+            target.role = role;
+            if (state.currentUser && state.currentUser.username === origUser) {
+              state.currentUser = { username, fullName, department, role };
+              state.role = role;
+              saveUserSession();
+            }
+          }
+          saveState();
+          closeUserEditorModal();
+          renderAll();
+          showToast(`แก้ไขข้อมูลบุคลากร "${fullName}" เรียบร้อยแล้ว`);
+        } else {
+          state.data.users.push({ username, password, fullName, department, role });
+          saveState();
+          closeUserEditorModal();
+          renderAll();
+          showToast(`เพิ่มบุคลากร "${fullName}" เรียบร้อยแล้ว`);
+        }
+      });
+
+      // Admin settings & bulk approve
+      document.getElementById('setting-auto-approve').addEventListener('change', (e) => {
+        state.data.autoApproveGeneral = e.target.checked;
+        saveState();
+        showToast('อัปเดตการตั้งค่าการอนุมัติอัตโนมัติแล้ว');
+      });
+
+      document.getElementById('btn-approve-all').addEventListener('click', () => {
+        let count = 0;
+        state.data.bookings.forEach(b => {
+          if (b.status === 'PENDING') {
+            b.status = 'APPROVED';
+            count++;
+          }
+        });
+        saveState();
+        renderAll();
+        showToast(count > 0 ? `อนุมัติคำขอจองทั้งหมด ${count} รายการเรียบร้อย` : 'ไม่มีรายการที่รออนุมัติ');
+      });
+
+      document.getElementById('btn-reset-demo-data').addEventListener('click', () => {
+        state.data = createDefaultData();
+        state.selectedDate = getTodayISO();
+        saveState();
+        renderAll();
+        showToast('รีเซ็ตข้อมูลตัวอย่างเริ่มต้นของโรงเรียนเรียบร้อยแล้ว');
+      });
+
+      // Event Delegation for dynamic buttons
+      document.body.addEventListener('click', (e) => {
+        const quickSlotBtn = e.target.closest('.btn-quick-slot');
+        if (quickSlotBtn) {
+          const rId = quickSlotBtn.getAttribute('data-room-id');
+          const period = Number(quickSlotBtn.getAttribute('data-period'));
+          openBookingModal(rId, period);
+          return;
+        }
+
+        const viewBookingBtn = e.target.closest('.btn-view-booking');
+        if (viewBookingBtn) {
+          const bId = viewBookingBtn.getAttribute('data-booking-id');
+          openBookingDetail(bId);
+          return;
+        }
+
+        const bookRoomBtn = e.target.closest('.btn-book-this-room');
+        if (bookRoomBtn) {
+          const rId = bookRoomBtn.getAttribute('data-book-room-id');
+          openBookingModal(rId, 1);
+          return;
+        }
+
+        const approveSingleBtn = e.target.closest('.btn-approve-single');
+        if (approveSingleBtn) {
+          const bId = approveSingleBtn.getAttribute('data-approve-id');
+          const b = state.data.bookings.find(item => item.id === bId);
+          if (b) {
+            b.status = 'APPROVED';
+            saveState();
+            closeDetailModal();
+            renderAll();
+            showToast(`อนุมัติรายการจอง ${esc(b.id)} เรียบร้อยแล้ว`);
+          }
+          return;
+        }
+
+        const rejectSingleBtn = e.target.closest('.btn-reject-single');
+        if (rejectSingleBtn) {
+          const bId = rejectSingleBtn.getAttribute('data-reject-id');
+          const b = state.data.bookings.find(item => item.id === bId);
+          if (b) {
+            b.status = 'REJECTED';
+            saveState();
+            renderAll();
+            showToast(`ปฏิเสธรายการจอง ${esc(b.id)} แล้ว`, 'warning');
+          }
+          return;
+        }
+
+        const editRoomBtn = e.target.closest('.btn-edit-room');
+        if (editRoomBtn) {
+          openRoomEditorModal(editRoomBtn.getAttribute('data-edit-room-id'));
+          return;
+        }
+
+        const deleteRoomBtn = e.target.closest('.btn-delete-room');
+        if (deleteRoomBtn) {
+          const rId = deleteRoomBtn.getAttribute('data-delete-room-id');
+          const idx = state.data.rooms.findIndex(r => r.id === rId);
+          if (idx !== -1) {
+            const removed = state.data.rooms.splice(idx, 1)[0];
+            saveState();
+            renderAll();
+            showToast(`ลบห้อง "${removed.name}" เรียบร้อยแล้ว`, 'warning');
+          }
+          return;
+        }
+
+        const editBookingBtn = e.target.closest('.btn-edit-booking');
+        if (editBookingBtn) {
+          openBookingModal(null, 1, editBookingBtn.getAttribute('data-edit-booking-id'));
+          return;
+        }
+
+        const adminDeleteBookingBtn = e.target.closest('.btn-admin-delete-booking');
+        if (adminDeleteBookingBtn) {
+          const bId = adminDeleteBookingBtn.getAttribute('data-delete-booking-id');
+          const idx = state.data.bookings.findIndex(b => b.id === bId);
+          if (idx !== -1) {
+            state.data.bookings.splice(idx, 1);
+            saveState();
+            renderAll();
+            showToast(`ลบรายการจอง ${bId} เรียบร้อยแล้ว`, 'warning');
+          }
+          return;
+        }
+
+        const editUserBtn = e.target.closest('.btn-edit-user');
+        if (editUserBtn) {
+          openUserEditorModal(editUserBtn.getAttribute('data-edit-username'));
+          return;
+        }
+
+        const deleteUserBtn = e.target.closest('.btn-delete-user');
+        if (deleteUserBtn) {
+          const uname = deleteUserBtn.getAttribute('data-delete-username');
+          const idx = (state.data.users || []).findIndex(u => u.username === uname);
+          if (idx !== -1) {
+            const removed = state.data.users.splice(idx, 1)[0];
+            saveState();
+            renderAll();
+            showToast(`ลบบัญชีผู้ใช้ "${removed.fullName}" เรียบร้อยแล้ว`, 'warning');
+          }
+          return;
+        }
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', sicecInit);
+      window.addEventListener('load', sicecInit);
+    } else {
+      sicecInit();
+    }
+  </script>
+</body>
+</html>
